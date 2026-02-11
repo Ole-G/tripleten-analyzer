@@ -1,0 +1,16 @@
+# Core
+google-api-python-client>=2.100.0
+youtube-transcript-api>=1.2.0
+anthropic>=0.40.0
+pandas>=2.1.0
+python-dotenv>=1.0.0
+PyYAML>=6.0.1
+isodate>=0.6.1
+
+# Export / Sheets
+gspread>=5.12.0
+google-auth>=2.23.0
+
+# Testing
+pytest>=7.4.0
+pytest-mock>=3.12.0
