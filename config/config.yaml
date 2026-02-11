@@ -1,0 +1,41 @@
+# TripleTen Ad Integration Analyzer Configuration
+# API keys are loaded from environment variables — NEVER put keys here.
+
+project:
+  name: "TripleTen Ad Integration Analyzer"
+  version: "0.1.0"
+
+paths:
+  input_dir: "data/input"
+  raw_dir: "data/raw"
+  enriched_dir: "data/enriched"
+  output_dir: "data/output"
+  logs_dir: "logs"
+  integrations_file: "data/input/integrations_list.csv"
+  sales_file: "data/input/sales_data.csv"
+
+youtube:
+  api_key_env: "YOUTUBE_API_KEY"
+  transcript_languages: ["uk", "ru", "en"]
+  batch_size: 50
+  output_file: "data/raw/youtube_raw.json"
+
+instagram:
+  output_file: "data/raw/instagram_raw.json"
+
+llm:
+  provider: "anthropic"
+  anthropic_key_env: "ANTHROPIC_API_KEY"
+  openai_key_env: "OPENAI_API_KEY"
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 4096
+
+retry:
+  max_retries: 3
+  backoff_base: 2
+  backoff_max: 60
+
+logging:
+  level: "INFO"
+  file_level: "DEBUG"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
