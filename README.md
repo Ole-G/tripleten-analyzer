@@ -36,14 +36,19 @@ tripleten-analyzer/
 │   ├── parsers/
 │   │   ├── base_parser.py         # Abstract base with retry logic
 │   │   └── youtube_parser.py      # YouTube Data API + Transcript API
-│   ├── enrichment/                # LLM enrichment (future)
+│   ├── enrichment/                # LLM enrichment (Phase 2)
+│   │   ├── prompts.py            # Prompt templates for Claude
+│   │   ├── extract_integration.py # Extract ad segment from transcript
+│   │   └── analyze_content.py    # Analyze segment for content features
 │   ├── matching/                  # Sales data matching (future)
 │   ├── analysis/                  # Correlation analysis (future)
 │   └── export/                    # Google Sheets export (future)
 ├── scripts/
-│   └── data_prep.py               # Main pipeline entry point
+│   ├── data_prep.py               # Phase 1: data preparation pipeline
+│   └── run_enrichment.py          # Phase 2: LLM enrichment pipeline
 ├── tests/
-│   └── test_parsers.py            # 46 unit tests
+│   ├── test_parsers.py            # 46 unit tests (Phase 1)
+│   └── test_enrichment.py         # 22 unit tests (Phase 2)
 ├── requirements.txt
 └── .env.example                   # API key template
 ```
@@ -52,7 +57,7 @@ tripleten-analyzer/
 
 - **Python 3.11+**
 - **YouTube Data API key** (free, from [Google Cloud Console](https://console.cloud.google.com/apis/credentials))
-- **Anthropic API key** (for future LLM enrichment phases)
+- **Anthropic API key** (for Phase 2 LLM enrichment — [Anthropic Console](https://console.anthropic.com/))
 
 ### Getting a YouTube Data API key
 
@@ -120,7 +125,46 @@ The CSV must be semicolon-separated (`;`) with at minimum these columns: `Date`,
 pytest tests/ -v
 ```
 
-All 46 tests run without API keys (they test pure logic: URL extraction, date conversion, number parsing, URL classification, deduplication, etc.).
+All 68 tests run without API keys (they test pure logic: URL extraction, date conversion, number parsing, URL classification, deduplication, LLM response parsing, etc.).
+
+### Run LLM enrichment (Phase 2)
+
+**Prerequisites**: Complete Phase 1 first (`python -m scripts.data_prep`), which generates `data/raw/youtube_raw.json`. You also need a valid `ANTHROPIC_API_KEY` in your `.env` file.
+
+```bash
+python -m scripts.run_enrichment
+```
+
+This will:
+1. Read `data/raw/youtube_raw.json` (YouTube videos with transcripts)
+2. For each video with a transcript:
+   - **Extract** the ad integration segment using Claude (identifies the sponsored section from the full transcript)
+   - **Analyze** the extracted segment for structured content features (offer type, CTA, tone, 8 quality scores, etc.)
+3. Save outputs:
+   - `data/enriched/youtube_enriched.json` — full enriched data (original + extraction + analysis)
+   - `data/enriched/enrichment_summary.csv` — flat table for quick analysis in spreadsheets
+
+**Resume support**: The script saves checkpoints every 10 records. If interrupted, just re-run the same command — already-processed videos will be skipped.
+
+#### Use a custom input file
+
+```bash
+python -m scripts.run_enrichment --input path/to/your/youtube_raw.json
+```
+
+#### Enrichment output fields
+
+Each video gets two enrichment steps:
+
+**Extraction** — identifies the ad segment:
+- `integration_text`, `integration_start_sec`, `integration_duration_sec`, `integration_position`, `is_full_video_ad`
+
+**Analysis** — structured content features:
+- Offer: `offer_type`, `offer_details`, `landing_type`
+- CTA: `cta_type`, `cta_urgency`, `cta_text`
+- Narrative: `has_personal_story`, `personal_story_type`, `pain_points_addressed`, `benefits_mentioned`
+- Quality scores (1-10): `urgency`, `authenticity`, `storytelling`, `benefit_clarity`, `emotional_appeal`, `specificity`, `humor`, `professionalism`
+- Meta: `overall_tone`, `language`, `product_positioning`, `target_audience_implied`, `social_proof`, `objection_handling`, `competitive_mention`, `price_mentioned`
 
 ## Configuration
 
@@ -207,7 +251,7 @@ Transcripts are fetched with language fallback: Ukrainian → Russian → Englis
 ## Roadmap
 
 - [x] **Phase 1**: Data preparation + YouTube parsing
-- [ ] **Phase 2**: LLM enrichment (extract integration text from transcripts, analyze tone/CTA/offer)
+- [x] **Phase 2**: LLM enrichment (extract integration text from transcripts, analyze tone/CTA/offer)
 - [ ] **Phase 3**: Sales funnel matching (correlate content features with conversion metrics)
 - [ ] **Phase 4**: Correlation analysis via Claude Opus (find patterns between content and ROAS)
 - [ ] **Phase 5**: Export to Google Sheets + report generation
