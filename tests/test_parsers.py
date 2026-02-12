@@ -176,7 +176,7 @@ class TestClassifyUrl:
         result = classify_url(
             "https://drive.google.com/drive/folders/1XEUfS46Dp", "story"
         )
-        assert result["is_parseable"] is False
+        assert result["is_parseable"] is True
         assert result["url_type"] == "drive_link"
 
     def test_empty_url(self):

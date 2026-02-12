@@ -15,9 +15,9 @@ Automated pipeline that collects data about TripleTen's advertising integrations
 |--------|-------|--------|-----------|
 | YouTube | 62 | 56 | 56 |
 | Instagram Reel | 42 | 37 | 37 |
-| Story | 27 | 24 | 0 (local files / Drive links) |
+| Story | 27 | 24 | 5 (Google Drive links) |
 | TikTok | 3 | 3 | 3 |
-| **Total** | **134** | **120** | **96** |
+| **Total** | **134** | **120** | **101** |
 
 ## Project structure
 
