@@ -162,7 +162,7 @@ def classify_url(url: str, fmt: str) -> dict:
 
     # Google Drive links
     if "drive.google.com" in url:
-        return {"is_parseable": False, "url_type": "drive_link", "content_id": None}
+        return {"is_parseable": True, "url_type": "drive_link", "content_id": None}
 
     # Local files (.mp4, .mov, etc.)
     if re.search(r"\.(mp4|mov|avi|mkv)$", url, re.IGNORECASE):
