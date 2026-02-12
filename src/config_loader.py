@@ -41,8 +41,8 @@ def load_config(config_path: str = None) -> dict:
 
     # Resolve paths to absolute
     for key in [
-        "input_dir", "raw_dir", "enriched_dir", "output_dir",
-        "logs_dir", "integrations_file", "sales_file",
+        "source_dir", "raw_dir", "enriched_dir", "output_dir",
+        "logs_dir", "integrations_file",
     ]:
         if key in config.get("paths", {}):
             config["paths"][key] = str(project_root / config["paths"][key])

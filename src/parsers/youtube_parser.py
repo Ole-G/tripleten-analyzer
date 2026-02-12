@@ -171,18 +171,31 @@ class YouTubeParser(BaseParser):
         """
         Extract YouTube video ID from various URL formats.
 
-        Handles: watch?v=, youtu.be/, /embed/, /shorts/
+        Handles: watch?v=, youtu.be/, /embed/, /shorts/, /live/
         """
         patterns = [
             r"(?:youtube\.com/watch\?.*v=)([a-zA-Z0-9_-]{11})",
             r"(?:youtu\.be/)([a-zA-Z0-9_-]{11})",
             r"(?:youtube\.com/embed/)([a-zA-Z0-9_-]{11})",
             r"(?:youtube\.com/shorts/)([a-zA-Z0-9_-]{11})",
+            r"(?:youtube\.com/live/)([a-zA-Z0-9_-]{11})",
         ]
         for pattern in patterns:
             match = re.search(pattern, url)
             if match:
                 return match.group(1)
+        return None
+
+    @staticmethod
+    def extract_integration_timestamp(url: str) -> Optional[int]:
+        """
+        Extract integration timestamp (?t=NNN or ?t=NNNs) from a YouTube URL.
+
+        Returns seconds as int, or None if no timestamp found.
+        """
+        match = re.search(r"[?&]t=(\d+)s?", url)
+        if match:
+            return int(match.group(1))
         return None
 
     # ── YouTube Data API Calls ─────────────────────────────────
