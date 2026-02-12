@@ -3,16 +3,29 @@
 
 project:
   name: "TripleTen Ad Integration Analyzer"
-  version: "0.1.0"
+  version: "0.2.0"
 
 paths:
-  input_dir: "data/input"
+  source_dir: "data/source"
   raw_dir: "data/raw"
   enriched_dir: "data/enriched"
   output_dir: "data/output"
   logs_dir: "logs"
-  integrations_file: "data/input/integrations_list.csv"
-  sales_file: "data/input/sales_data.csv"
+  integrations_file: "data/source/Tripleten_Test_Assignment2-Claude.csv"
+
+platforms:
+  youtube:
+    parseable: true
+    parser: "youtube_parser"
+  reel:
+    parseable: true
+    parser: "reels_parser"  # future
+  story:
+    parseable: false  # mostly local files
+    parser: null
+  tiktok:
+    parseable: true
+    parser: null  # future
 
 youtube:
   api_key_env: "YOUTUBE_API_KEY"
