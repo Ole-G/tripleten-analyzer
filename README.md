@@ -43,7 +43,7 @@ tripleten-analyzer/
 ├── scripts/
 │   └── data_prep.py               # Main pipeline entry point
 ├── tests/
-│   └── test_parsers.py            # 40 unit tests
+│   └── test_parsers.py            # 46 unit tests
 ├── requirements.txt
 └── .env.example                   # API key template
 ```
@@ -120,7 +120,7 @@ The CSV must be semicolon-separated (`;`) with at minimum these columns: `Date`,
 pytest tests/ -v
 ```
 
-All 40 tests run without API keys (they test pure logic: URL extraction, date conversion, number parsing, URL classification, deduplication, etc.).
+All 46 tests run without API keys (they test pure logic: URL extraction, date conversion, number parsing, URL classification, deduplication, etc.).
 
 ## Configuration
 

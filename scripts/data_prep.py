@@ -16,6 +16,7 @@ import re
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 
@@ -32,18 +33,12 @@ REQUIRED_COLUMNS = ["Date", "Name", "Format", "Ad link"]
 
 SUPPORTED_FORMATS = {"youtube", "reel", "story", "tiktok"}
 
-# Numeric columns that use comma as decimal separator in the CSV
-NUMERIC_COLUMNS = [
-    "Budget", "Reach (Plan)", "Fact Reach", "Median %",
-    "CPM (Plan)", "CPM Fact", "CTR Plan", "CTR Fact",
-    "Traffic Plan", "Traffic Fact", "CPC Plan", "CPC Fact",
-    "CR0 Plan", "CR0 Fact", "Contacts Plan", "Contacts Fact",
-    "CPContact Plan", "CPContact Fact",
-    "Deals Plan", "Deals Fact",
-    "Calls Plan", "Calls Fact",
-    "Purchase F - TOTAL", "CMC F - TOTAL",
-    "Purchase P - 1 month", "Purchase F - 1 month",
-]
+# Text columns that should NOT be converted to numbers.
+# All other columns are treated as numeric (comma → dot conversion).
+TEXT_COLUMNS = {
+    "Date", "Name", "Profile link", "Topic", "Manager", "Format",
+    "Ad link", "UTM Link", "UTM Campaign",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +46,19 @@ logger = logging.getLogger(__name__)
 # ── Helpers ────────────────────────────────────────────────────
 
 
-def convert_excel_date(serial) -> str:
+def convert_excel_date(serial) -> Optional[str]:
     """
     Convert an Excel serial date number to ISO date string (YYYY-MM-DD).
 
-    Also handles already-formatted dates (e.g. "27/10/2025") and
-    falls back to the original string for unparseable values.
+    Also handles already-formatted dates (e.g. "27/10/2025").
+    Returns None for unparseable values (e.g. bare month names like "October").
     """
+    if serial is None:
+        return None
+
     s = str(serial).strip()
+    if not s or s.lower() == "nan":
+        return None
 
     # Try parsing as a regular date string first (e.g. "27/10/2025")
     for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y"):
@@ -76,7 +76,8 @@ def convert_excel_date(serial) -> str:
     except (ValueError, TypeError, OverflowError):
         pass
 
-    return s
+    logger.warning("Could not parse date value: '%s'", s)
+    return None
 
 
 def parse_european_number(val) -> float:
@@ -103,7 +104,8 @@ def classify_url(url: str, fmt: str) -> dict:
     Returns dict with:
         is_parseable: bool — can we fetch data from this URL?
         url_type: str — 'youtube', 'instagram_reel', 'instagram_story',
-                        'tiktok', 'local_file', 'drive_link', 'other', 'empty'
+                        'instagram_post', 'instagram_other', 'tiktok',
+                        'local_file', 'drive_link', 'other', 'empty'
         content_id: str|None — platform-specific content identifier
     """
     if not url or not isinstance(url, str):
@@ -131,9 +133,23 @@ def classify_url(url: str, fmt: str) -> dict:
             "content_id": reel_match.group(1),
         }
 
-    # Instagram Story / Post
+    # Instagram Story (stories/ or /s/)
+    story_match = re.search(r"instagram\.com/stories/", url)
+    if story_match:
+        return {"is_parseable": False, "url_type": "instagram_story", "content_id": None}
+
+    # Instagram Post (/p/CODE/)
+    post_match = re.search(r"instagram\.com/p/([A-Za-z0-9_-]+)", url)
+    if post_match:
+        return {
+            "is_parseable": True,
+            "url_type": "instagram_post",
+            "content_id": post_match.group(1),
+        }
+
+    # Other Instagram URLs (profiles, etc.) — not parseable
     if "instagram.com" in url:
-        return {"is_parseable": True, "url_type": "instagram_story", "content_id": None}
+        return {"is_parseable": False, "url_type": "instagram_other", "content_id": None}
 
     # TikTok
     tiktok_match = re.search(r"tiktok\.com/.*/video/(\d+)", url)
@@ -195,9 +211,9 @@ def validate_input(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     # 3. Convert Excel serial dates
     df["Date"] = df["Date"].apply(convert_excel_date)
 
-    # 4. Convert numeric columns (comma → dot)
-    for col in NUMERIC_COLUMNS:
-        if col in df.columns:
+    # 4. Convert numeric columns (comma → dot) — everything except TEXT_COLUMNS
+    for col in df.columns:
+        if col not in TEXT_COLUMNS:
             df[col] = df[col].apply(parse_european_number)
 
     # 5. Classify URLs
@@ -302,28 +318,22 @@ def _merge_input_metadata(
     """
     Merge full CSV row data into parsed results by matching on Ad link URL.
 
-    Attaches: Name, Topic, Manager, Format, Budget, Date, UTM Campaign,
-    and all funnel metric columns from the source CSV.
+    Merges ALL columns from the input DataFrame (except 'Ad link' which is
+    already present as 'url' in parsed results).
     """
-    # Build lookup by Ad link
-    merge_columns = [
-        "Name", "Date", "Topic", "Manager", "Format", "UTM Campaign",
-        "Budget", "Fact Reach", "Contacts Fact", "Deals Fact",
-        "Calls Fact", "Purchase F - TOTAL", "CMC F - TOTAL",
-        "is_parseable", "content_id", "integration_timestamp",
-    ]
-
+    # Build lookup by Ad link — include all columns
     input_lookup: dict[str, dict] = {}
     for _, row in input_df.iterrows():
         ad_link = str(row.get("Ad link", "")).strip()
         row_data = {}
-        for col in merge_columns:
-            if col in row.index:
-                val = row[col]
-                # Convert NaN to None for cleaner JSON
-                if isinstance(val, float) and math.isnan(val):
-                    val = None
-                row_data[col] = val
+        for col in row.index:
+            if col == "Ad link":
+                continue  # already present as "url" in parsed results
+            val = row[col]
+            # Convert NaN to None for cleaner JSON
+            if isinstance(val, float) and math.isnan(val):
+                val = None
+            row_data[col] = val
         input_lookup[ad_link] = row_data
 
     for result in parsed_results:

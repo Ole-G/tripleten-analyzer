@@ -19,6 +19,7 @@ from scripts.data_prep import (
     parse_european_number,
     classify_url,
     REQUIRED_COLUMNS,
+    TEXT_COLUMNS,
 )
 
 
@@ -99,13 +100,22 @@ class TestConvertExcelDate:
     def test_string_input(self):
         assert convert_excel_date("45748") == "2025-04-01"
 
-    def test_invalid_returns_string(self):
-        assert convert_excel_date("not-a-date") == "not-a-date"
+    def test_invalid_returns_none(self):
+        assert convert_excel_date("not-a-date") is None
 
     def test_another_date(self):
         # 45952 should be a valid date later in 2025
         result = convert_excel_date(45952)
         assert result.startswith("2025-")
+
+    def test_october_returns_none(self):
+        assert convert_excel_date("October") is None
+
+    def test_none_returns_none(self):
+        assert convert_excel_date(None) is None
+
+    def test_date_string_dd_mm_yyyy(self):
+        assert convert_excel_date("27/10/2025") == "2025-10-27"
 
 
 # ── parse_european_number ──────────────────────────────────────
@@ -178,6 +188,26 @@ class TestClassifyUrl:
         result = classify_url("nan", "story")
         assert result["is_parseable"] is False
         assert result["url_type"] == "empty"
+
+    def test_instagram_profile_not_parseable(self):
+        result = classify_url("https://www.instagram.com/someblogger/", "story")
+        assert result["is_parseable"] is False
+        assert result["url_type"] == "instagram_other"
+
+    def test_instagram_post(self):
+        result = classify_url(
+            "https://www.instagram.com/p/ABC123def_/", "reel"
+        )
+        assert result["is_parseable"] is True
+        assert result["url_type"] == "instagram_post"
+        assert result["content_id"] == "ABC123def_"
+
+    def test_instagram_story_url(self):
+        result = classify_url(
+            "https://www.instagram.com/stories/someblogger/12345/", "story"
+        )
+        assert result["is_parseable"] is False
+        assert result["url_type"] == "instagram_story"
 
 
 # ── validate_input ─────────────────────────────────────────────
