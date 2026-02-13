@@ -88,3 +88,78 @@ Return ONLY a valid JSON object with these exact fields:
 }}
 
 Return ONLY the JSON object, no additional text or markdown fencing."""
+
+
+TEXTUAL_ANALYSIS_PROMPT = """\
+You are a linguistic analyst specializing in persuasion and advertising copy.
+
+Analyze the following ad integration text from an influencer video promoting \
+TripleTen (an online tech education platform). Extract granular textual features \
+that can be used for statistical correlation with conversion outcomes.
+
+## Integration text
+{integration_text}
+
+## Instructions
+Extract the following features precisely. Only include elements that are \
+explicitly present in the text — do not infer or hallucinate.
+
+## Response format
+Return ONLY a valid JSON object with these exact fields:
+{{
+    "opening_pattern": {{
+        "first_sentence": "<exact first sentence of the integration>",
+        "opening_type": "<one of: personal_anecdote, direct_sponsor_mention, problem_statement, question, statistic, smooth_transition, abrupt_cut>",
+        "opening_hook": "<the specific hook phrase used to start the ad, max 15 words>"
+    }},
+    "closing_pattern": {{
+        "last_sentence": "<exact last sentence of the integration>",
+        "closing_type": "<one of: cta_repeat, benefit_summary, urgency_push, casual_dismiss, back_to_content, emotional_close>",
+        "closing_phrase": "<the specific closing phrase, max 15 words>"
+    }},
+    "transition": {{
+        "transition_phrase": "<exact phrase used to bridge from regular content to ad, null if no clear transition>",
+        "transition_style": "<one of: seamless, topic_related, abrupt, meta_acknowledgment, humor_bridge, none>",
+        "acknowledges_sponsorship": <true if blogger explicitly says 'sponsor', 'sponsored', 'ad', 'partnered' etc.>
+    }},
+    "persuasion_phrases": [
+        {{
+            "phrase": "<exact phrase from text, max 20 words>",
+            "function": "<one of: urgency, social_proof, benefit, pain_point, objection_handling, credibility, scarcity, fomo, empathy, authority>",
+            "position": "<one of: opening, middle, closing>"
+        }}
+    ],
+    "benefit_framings": [
+        "<exact benefit statement as phrased by blogger, e.g. 'change your career in 7 months'>"
+    ],
+    "pain_point_framings": [
+        "<exact pain point statement as phrased by blogger, e.g. 'stuck in a dead-end job'>"
+    ],
+    "cta_phrases": [
+        {{
+            "phrase": "<exact CTA wording>",
+            "type": "<one of: link_click, promo_code, sign_up, consultation, download>",
+            "urgency_words": ["<any urgency words in CTA: limited, now, today, hurry, etc.>"]
+        }}
+    ],
+    "specificity_markers": [
+        "<any specific claims: prices, timeframes, percentages, numbers — exact quotes>"
+    ],
+    "emotional_triggers": [
+        "<phrases designed to trigger emotional response — exact quotes>"
+    ],
+    "rhetorical_questions": [
+        "<any rhetorical questions used in the integration>"
+    ],
+    "text_stats": {{
+        "word_count": <total words in integration>,
+        "sentence_count": <total sentences>,
+        "question_count": <number of questions asked>,
+        "exclamation_count": <number of exclamatory sentences>,
+        "first_person_count": <number of times 'I', 'my', 'me' used>,
+        "second_person_count": <number of times 'you', 'your' used>,
+        "product_name_mentions": <how many times 'TripleTen' or 'Triple Ten' mentioned>
+    }}
+}}
+
+Return ONLY the JSON object, no additional text or markdown fencing."""

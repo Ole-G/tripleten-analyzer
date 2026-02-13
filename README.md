@@ -36,17 +36,20 @@ tripleten-analyzer/
 │   ├── parsers/
 │   │   ├── base_parser.py         # Abstract base with retry logic
 │   │   └── youtube_parser.py      # YouTube Data API + Transcript API
-│   ├── enrichment/                # LLM enrichment (Phase 2)
+│   ├── enrichment/                # LLM enrichment (Phase 2, 5)
 │   │   ├── prompts.py            # Prompt templates for Claude
 │   │   ├── extract_integration.py # Extract ad segment from transcript
-│   │   └── analyze_content.py    # Analyze segment for content features
+│   │   ├── analyze_content.py    # Analyze segment for content features
+│   │   └── textual_analysis.py   # Extract textual features (Phase 5)
 │   ├── transcription/            # Audio download + Whisper (Phase 2.5)
 │   │   ├── download_audio.py     # yt-dlp wrapper for all platforms
 │   │   └── whisper_transcribe.py # OpenAI Whisper API transcription
-│   ├── analysis/                  # Correlation analysis (Phase 3-4)
-│   │   ├── prompts.py            # Analysis prompt for Claude Opus
+│   ├── analysis/                  # Correlation analysis (Phase 3-5)
+│   │   ├── prompts.py            # Analysis prompts for Claude Opus
 │   │   ├── merge_and_calculate.py # Merge data + calculate metrics
-│   │   └── correlation_analysis.py # Send to Claude for analysis
+│   │   ├── correlation_analysis.py # Send to Claude for analysis
+│   │   ├── textual_correlation.py # Compare textual features (Phase 5)
+│   │   └── textual_report.py     # Generate synthesis report (Phase 5)
 │   ├── matching/                  # Sales data matching (future)
 │   └── export/                    # Google Sheets export (future)
 ├── scripts/
@@ -54,12 +57,14 @@ tripleten-analyzer/
 │   ├── run_enrichment.py          # Phase 2: LLM enrichment (YouTube)
 │   ├── run_transcription.py       # Phase 2.5: download + transcribe
 │   ├── run_enrichment_reels.py    # Phase 2.5: enrich Reels/TikTok
-│   └── run_analysis.py            # Phase 3-4: correlation analysis
+│   ├── run_analysis.py            # Phase 3-4: correlation analysis
+│   └── run_textual_analysis.py    # Phase 5: textual analysis pipeline
 ├── tests/
 │   ├── test_parsers.py            # 46 unit tests (Phase 1)
 │   ├── test_enrichment.py         # 22 unit tests (Phase 2)
 │   ├── test_transcription.py      # 14 unit tests (Phase 2.5)
-│   └── test_analysis.py           # 22 unit tests (Phase 3-4)
+│   ├── test_analysis.py           # 22 unit tests (Phase 3-4)
+│   └── test_textual_analysis.py   # 21 unit tests (Phase 5)
 ├── requirements.txt
 └── .env.example                   # API key template
 ```
@@ -137,7 +142,7 @@ The CSV must be semicolon-separated (`;`) with at minimum these columns: `Date`,
 pytest tests/ -v
 ```
 
-All 104 tests run without API keys (they test pure logic: URL extraction, date conversion, number parsing, URL classification, deduplication, LLM response parsing, metric calculations, audio download, transcription, etc.).
+All 125 tests run without API keys (they test pure logic: URL extraction, date conversion, number parsing, URL classification, deduplication, LLM response parsing, metric calculations, audio download, transcription, textual analysis, etc.).
 
 ### Run LLM enrichment (Phase 2)
 
@@ -261,6 +266,70 @@ python -m scripts.run_analysis --model claude-sonnet-4-5-20250929
 
 **Note**: This step uses Claude Opus by default for deep analysis. Expected cost: ~$5-10 per run. Use `--model claude-sonnet-4-5-20250929` for a cheaper alternative.
 
+### Textual analysis (Phase 5)
+
+Extracts granular linguistic features from ad integration texts, compares
+patterns between integrations with purchases vs without, and generates
+a synthesis report that builds on the existing correlation analysis.
+
+**Prerequisites**: Complete Phases 1-4 first.
+
+```bash
+# Full pipeline: extract → compare → report
+python -m scripts.run_textual_analysis
+
+# Process only YouTube integrations
+python -m scripts.run_textual_analysis --platform youtube
+
+# Skip extraction, rebuild comparison and report
+python -m scripts.run_textual_analysis --skip-extraction
+
+# Only extract and compare, skip report generation
+python -m scripts.run_textual_analysis --skip-report
+
+# Use specific model for report
+python -m scripts.run_textual_analysis --report-model claude-sonnet-4-5-20250929
+```
+
+This will:
+1. **Step 1 — Extract** (Sonnet, ~$1-2): For each enriched integration, extract textual
+   features via Claude: opening/closing patterns, transition styles, persuasion phrases,
+   benefit/pain framings, CTA wording, text statistics. Saved into enriched JSON files.
+2. **Step 2 — Compare** (no LLM): Build a comparative summary
+   (`data/enriched/textual_comparison.json`) comparing all features between
+   integrations with/without purchases.
+3. **Step 3 — Report** (Opus, ~$5-10): Generate `data/output/textual_analysis_report.md`
+   — a comprehensive textual analysis report that reads and cross-references the
+   existing `analysis_report.md`, synthesizing quantitative findings with textual insights.
+
+**Total estimated cost**: ~$6-12 per full run.
+
+**Note**: This phase does NOT re-run any previous phases. It reads existing enriched data
+and the existing report, adds textual analysis on top, and generates a new report that
+synthesizes both layers.
+
+#### Output files
+
+| File | Description |
+|------|-------------|
+| `data/enriched/*_enriched.json` | Updated with `enrichment.textual` field per record |
+| `data/enriched/textual_comparison.json` | Aggregated comparison: winners vs losers |
+| `data/output/textual_analysis_report.md` | **Final textual analysis report** |
+
+#### Textual features extracted
+
+| Category | Fields |
+|----------|--------|
+| Opening | opening_type, opening_hook, first_sentence |
+| Closing | closing_type, closing_phrase, last_sentence |
+| Transition | transition_style, transition_phrase, acknowledges_sponsorship |
+| Persuasion | List of phrases with function (urgency, social_proof, benefit, etc.) |
+| Benefits | Exact benefit framings as stated by blogger |
+| Pain points | Exact pain point framings |
+| CTAs | Exact CTA wording with urgency word detection |
+| Specificity | Concrete claims (prices, timeframes, percentages) |
+| Text stats | word_count, sentence_count, question_count, you/I ratio, product mentions |
+
 #### Calculated metrics
 
 | Metric | Formula |
@@ -364,7 +433,8 @@ Transcripts are fetched with language fallback: Ukrainian → Russian → Englis
 - [x] **Phase 2.5**: Multi-platform transcription & enrichment (Whisper + Reels/TikTok)
 - [x] **Phase 3**: Sales funnel matching (merge data, calculate conversion metrics)
 - [x] **Phase 4**: Correlation analysis via Claude Opus (find patterns between content and ROAS)
-- [ ] **Phase 5**: Export to Google Sheets + report generation
+- [x] **Phase 5**: Textual analysis (extract phrases, compare winners vs losers, synthesis report)
+- [ ] **Phase 6**: Export to Google Sheets + dashboard
 
 ## Troubleshooting
 
