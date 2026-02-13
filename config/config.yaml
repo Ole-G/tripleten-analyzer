@@ -52,3 +52,17 @@ logging:
   level: "INFO"
   file_level: "DEBUG"
   format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+
+transcription:
+  whisper_model: "whisper-1"
+  audio_format: "mp3"
+  audio_quality: 5
+  audio_dir: "data/raw/audio"
+  max_file_size_mb: 25
+  checkpoint_interval: 5
+  instagram_cookies_file: null  # Set path if Instagram downloads fail
+
+analysis:
+  model: "claude-opus-4-6"  # Opus for deep analysis
+  max_tokens: 16384
+  # exclude_fields: uses DEFAULT_EXCLUDE_FIELDS from correlation_analysis.py

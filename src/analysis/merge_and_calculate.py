@@ -1,0 +1,233 @@
+"""Merge all data sources and calculate additional metrics."""
+
+import json
+import logging
+import math
+from pathlib import Path
+
+import pandas as pd
+
+from src.config_loader import load_config
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_divide(numerator, denominator):
+    """Divide two values, returning None for division by zero or NaN inputs."""
+    try:
+        if denominator is None or (isinstance(denominator, float) and math.isnan(denominator)):
+            return None
+        if numerator is None or (isinstance(numerator, float) and math.isnan(numerator)):
+            return None
+        if denominator == 0:
+            return None
+        return numerator / denominator
+    except (TypeError, ZeroDivisionError):
+        return None
+
+
+def calculate_metrics(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add calculated metric columns to the DataFrame.
+
+    Metrics are derived from the marketing funnel columns.
+    Division by zero produces NaN.
+    """
+    df = df.copy()
+
+    # Cost efficiency metrics
+    df["cost_per_view"] = df.apply(
+        lambda r: _safe_divide(r.get("Budget"), r.get("Fact Reach")), axis=1
+    )
+    df["cost_per_contact"] = df.apply(
+        lambda r: _safe_divide(r.get("Budget"), r.get("Contacts Fact")), axis=1
+    )
+    df["cost_per_deal"] = df.apply(
+        lambda r: _safe_divide(r.get("Budget"), r.get("Deals Fact")), axis=1
+    )
+    df["cost_per_purchase"] = df.apply(
+        lambda r: _safe_divide(r.get("Budget"), r.get("Purchase F - TOTAL")), axis=1
+    )
+
+    # Funnel conversion rates
+    df["traffic_to_contact_rate"] = df.apply(
+        lambda r: _safe_divide(r.get("Contacts Fact"), r.get("Traffic Fact")), axis=1
+    )
+    df["contact_to_deal_rate"] = df.apply(
+        lambda r: _safe_divide(r.get("Deals Fact"), r.get("Contacts Fact")), axis=1
+    )
+    df["deal_to_call_rate"] = df.apply(
+        lambda r: _safe_divide(r.get("Calls Fact"), r.get("Deals Fact")), axis=1
+    )
+    df["call_to_purchase_rate"] = df.apply(
+        lambda r: _safe_divide(r.get("Purchase F - TOTAL"), r.get("Calls Fact")), axis=1
+    )
+    df["full_funnel_conversion"] = df.apply(
+        lambda r: _safe_divide(r.get("Purchase F - TOTAL"), r.get("Fact Reach")), axis=1
+    )
+
+    # Plan vs fact
+    df["plan_vs_fact_reach"] = df.apply(
+        lambda r: _safe_divide(r.get("Fact Reach"), r.get("Reach (Plan)")), axis=1
+    )
+    df["plan_vs_fact_traffic"] = df.apply(
+        lambda r: _safe_divide(r.get("Traffic Fact"), r.get("Traffic Plan")), axis=1
+    )
+
+    # Boolean flag
+    df["has_purchases"] = df["Purchase F - TOTAL"].apply(
+        lambda v: bool(v and not (isinstance(v, float) and math.isnan(v)) and v > 0)
+    )
+
+    # YouTube-specific metrics (only where view_count exists)
+    if "view_count" in df.columns:
+        df["engagement_rate"] = df.apply(
+            lambda r: _safe_divide(
+                (r.get("like_count") or 0) + (r.get("comment_count") or 0),
+                r.get("view_count"),
+            )
+            if r.get("view_count")
+            else None,
+            axis=1,
+        )
+        df["view_to_reach_ratio"] = df.apply(
+            lambda r: _safe_divide(r.get("view_count"), r.get("Fact Reach"))
+            if r.get("view_count")
+            else None,
+            axis=1,
+        )
+
+    return df
+
+
+def merge_all_data(
+    prepared_csv_path: str = None,
+    enriched_json_path: str = None,
+    output_dir: str = None,
+) -> pd.DataFrame:
+    """
+    Merge prepared CSV with enriched YouTube data, calculate metrics.
+
+    Args:
+        prepared_csv_path: Path to prepared_integrations.csv (all 120 records).
+        enriched_json_path: Path to youtube_enriched.json (YouTube with enrichment).
+        output_dir: Directory for output files.
+
+    Returns:
+        Merged DataFrame with all records and calculated metrics.
+    """
+    config = load_config()
+
+    if prepared_csv_path is None:
+        prepared_csv_path = str(
+            Path(config["paths"]["output_dir"]) / "prepared_integrations.csv"
+        )
+    if enriched_json_path is None:
+        enriched_json_path = str(
+            Path(config["paths"]["enriched_dir"]) / "youtube_enriched.json"
+        )
+    if output_dir is None:
+        output_dir = config["paths"]["output_dir"]
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # 1. Read prepared CSV (all 120 records, all platforms)
+    prepared_df = pd.read_csv(prepared_csv_path)
+    logger.info("Loaded prepared CSV: %d rows, %d columns", *prepared_df.shape)
+
+    # 2. Read enriched JSON (YouTube with enrichment)
+    enriched_data = []
+    enriched_path = Path(enriched_json_path)
+    if enriched_path.exists():
+        with open(enriched_path, "r", encoding="utf-8") as f:
+            enriched_data = json.load(f)
+        logger.info("Loaded enriched JSON: %d items", len(enriched_data))
+    else:
+        logger.warning("Enriched JSON not found at %s, proceeding without", enriched_path)
+
+    # 3. Build enrichment lookup by Ad link URL
+    enrichment_lookup: dict[str, dict] = {}
+    for item in enriched_data:
+        url = item.get("url", "")
+        enrichment = item.get("enrichment", {})
+        if enrichment:
+            extraction = enrichment.get("extraction", {})
+            analysis = enrichment.get("analysis", {})
+            scores = analysis.get("scores", {})
+
+            flat = {}
+            # Extraction fields
+            for key in [
+                "integration_text", "integration_start_sec",
+                "integration_duration_sec", "integration_position",
+                "is_full_video_ad",
+            ]:
+                flat[f"enrichment_{key}"] = extraction.get(key)
+
+            # Analysis fields
+            for key in [
+                "offer_type", "offer_details", "landing_type",
+                "cta_type", "cta_urgency", "cta_text",
+                "has_personal_story", "personal_story_type",
+                "objection_handling", "social_proof",
+                "overall_tone", "language", "product_positioning",
+                "target_audience_implied", "competitive_mention",
+                "price_mentioned",
+            ]:
+                flat[f"enrichment_{key}"] = analysis.get(key)
+
+            # List fields → joined string
+            for key in ["pain_points_addressed", "benefits_mentioned"]:
+                val = analysis.get(key, [])
+                flat[f"enrichment_{key}"] = " | ".join(val) if val else None
+
+            # Scores
+            for score_key in [
+                "urgency", "authenticity", "storytelling", "benefit_clarity",
+                "emotional_appeal", "specificity", "humor", "professionalism",
+            ]:
+                flat[f"score_{score_key}"] = scores.get(score_key)
+
+            # YouTube metadata (not in prepared CSV)
+            for key in [
+                "view_count", "like_count", "comment_count",
+                "duration_seconds", "channel_subscribers", "channel_name",
+                "title",
+            ]:
+                if key in item:
+                    flat[key] = item[key]
+
+            enrichment_lookup[url] = flat
+
+    logger.info("Built enrichment lookup: %d entries", len(enrichment_lookup))
+
+    # 4. Merge enrichment into prepared DataFrame
+    enrichment_rows = []
+    for _, row in prepared_df.iterrows():
+        ad_link = str(row.get("Ad link", "")).strip()
+        enrich = enrichment_lookup.get(ad_link, {})
+        enrichment_rows.append(enrich)
+
+    enrichment_df = pd.DataFrame(enrichment_rows, index=prepared_df.index)
+    merged_df = pd.concat([prepared_df, enrichment_df], axis=1)
+
+    # 5. Calculate metrics
+    merged_df = calculate_metrics(merged_df)
+
+    logger.info(
+        "Merged data: %d rows, %d columns", *merged_df.shape,
+    )
+
+    # 6. Save outputs
+    csv_path = output_path / "final_merged.csv"
+    merged_df.to_csv(csv_path, index=False)
+    logger.info("Saved final_merged.csv to %s", csv_path)
+
+    json_path = output_path / "final_merged.json"
+    records = merged_df.where(merged_df.notna(), None).to_dict(orient="records")
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(records, f, ensure_ascii=False, indent=2, default=str)
+    logger.info("Saved final_merged.json to %s", json_path)
+
+    return merged_df
