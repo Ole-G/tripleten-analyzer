@@ -82,10 +82,7 @@ def main(
     retry_cfg = config.get("retry", {})
 
     report_path = Path(output_dir) / "analysis_report.md"
-    exclude_fields = analysis_cfg.get("exclude_fields", [
-        "transcript_full", "transcript_text", "description",
-        "thumbnail_url", "tags",
-    ])
+    exclude_fields = analysis_cfg.get("exclude_fields")  # None → use code default
 
     try:
         report = run_correlation_analysis(

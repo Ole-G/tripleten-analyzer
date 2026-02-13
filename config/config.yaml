@@ -56,10 +56,4 @@ logging:
 analysis:
   model: "claude-opus-4-6"  # Opus for deep analysis
   max_tokens: 16384
-  # Fields to exclude from Claude context (too long, waste tokens)
-  exclude_fields:
-    - transcript_full
-    - transcript_text
-    - description
-    - thumbnail_url
-    - tags
+  # exclude_fields: uses DEFAULT_EXCLUDE_FIELDS from correlation_analysis.py

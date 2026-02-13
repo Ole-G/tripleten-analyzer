@@ -2,6 +2,7 @@
 
 import json
 import logging
+import math
 import time
 
 import anthropic
@@ -17,6 +18,47 @@ DEFAULT_EXCLUDE_FIELDS = [
     "description",
     "thumbnail_url",
     "tags",
+    # URLs — not useful for correlation analysis
+    "Profile link",
+    "UTM Link",
+    "UTM Campaign",
+    "Ad link",
+    # Redundant with calculated metrics or enrichment
+    "is_parseable",
+    "content_id",
+    "integration_timestamp",
+    # Intermediate plan/fact columns (keep only key funnel metrics)
+    "CPM (Plan)",
+    "CPM Fact",
+    "CTR Plan",
+    "CTR Fact",
+    "CPC Plan",
+    "CPC Fact",
+    "CR0 Plan",
+    "CR0 Fact",
+    "Contacts Plan",
+    "CPContact Plan",
+    "CPContact Fact",
+    "CR1 Contact - deal\r\nPlan",
+    "CR1 Contact - deal \r\nFact",
+    "Deals Plan",
+    "CR3 Deal > call Plan",
+    "CR3 Deal > call Fact",
+    "Calls Plan",
+    "CR4 Call - GTC\r\nFact",
+    "GTC ? Plan",
+    "GTC ? Fact",
+    "?R Call > Purchase P  - 1 month",
+    "?R Call > Purchase F  - 1 month",
+    "Purchase P - 1 month",
+    "CMC P - 1 ???",
+    "CMC F - 1 month",
+    "Purchase F - 2 ?onth",
+    "CMC F - \r\n2 ?onth",
+    "Purchase F - \r\n3 ?onth",
+    "CMC F - \r\n3 ?onth",
+    "Purchase F - \r\n6 ?onth",
+    "CMC F - \r\n6 ?onth",
 ]
 
 
@@ -46,6 +88,11 @@ def _prepare_data_for_claude(
         item = {}
         for key, val in record.items():
             if key in exclude_set:
+                continue
+            # Skip null/NaN values to save tokens
+            if val is None:
+                continue
+            if isinstance(val, float) and math.isnan(val):
                 continue
             # Truncate long integration text
             if key == "enrichment_integration_text" and isinstance(val, str):
@@ -93,7 +140,7 @@ def run_correlation_analysis(
 
     # Prepare data for Claude (remove long fields)
     cleaned = _prepare_data_for_claude(records, exclude_fields)
-    data_str = json.dumps(cleaned, ensure_ascii=False, indent=1, default=str)
+    data_str = json.dumps(cleaned, ensure_ascii=False, separators=(",", ":"), default=str)
 
     logger.info(
         "Prepared data for Claude: %d records, %d chars",
