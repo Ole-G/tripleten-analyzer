@@ -40,15 +40,20 @@ tripleten-analyzer/
 │   │   ├── prompts.py            # Prompt templates for Claude
 │   │   ├── extract_integration.py # Extract ad segment from transcript
 │   │   └── analyze_content.py    # Analyze segment for content features
+│   ├── analysis/                  # Correlation analysis (Phase 3-4)
+│   │   ├── prompts.py            # Analysis prompt for Claude Opus
+│   │   ├── merge_and_calculate.py # Merge data + calculate metrics
+│   │   └── correlation_analysis.py # Send to Claude for analysis
 │   ├── matching/                  # Sales data matching (future)
-│   ├── analysis/                  # Correlation analysis (future)
 │   └── export/                    # Google Sheets export (future)
 ├── scripts/
 │   ├── data_prep.py               # Phase 1: data preparation pipeline
-│   └── run_enrichment.py          # Phase 2: LLM enrichment pipeline
+│   ├── run_enrichment.py          # Phase 2: LLM enrichment pipeline
+│   └── run_analysis.py            # Phase 3-4: correlation analysis
 ├── tests/
 │   ├── test_parsers.py            # 46 unit tests (Phase 1)
-│   └── test_enrichment.py         # 22 unit tests (Phase 2)
+│   ├── test_enrichment.py         # 22 unit tests (Phase 2)
+│   └── test_analysis.py           # 22 unit tests (Phase 3-4)
 ├── requirements.txt
 └── .env.example                   # API key template
 ```
@@ -57,7 +62,7 @@ tripleten-analyzer/
 
 - **Python 3.11+**
 - **YouTube Data API key** (free, from [Google Cloud Console](https://console.cloud.google.com/apis/credentials))
-- **Anthropic API key** (for Phase 2 LLM enrichment — [Anthropic Console](https://console.anthropic.com/))
+- **Anthropic API key** (for Phase 2 enrichment and Phase 3-4 analysis — [Anthropic Console](https://console.anthropic.com/))
 
 ### Getting a YouTube Data API key
 
@@ -125,7 +130,7 @@ The CSV must be semicolon-separated (`;`) with at minimum these columns: `Date`,
 pytest tests/ -v
 ```
 
-All 68 tests run without API keys (they test pure logic: URL extraction, date conversion, number parsing, URL classification, deduplication, LLM response parsing, etc.).
+All 90 tests run without API keys (they test pure logic: URL extraction, date conversion, number parsing, URL classification, deduplication, LLM response parsing, metric calculations, etc.).
 
 ### Run LLM enrichment (Phase 2)
 
@@ -165,6 +170,51 @@ Each video gets two enrichment steps:
 - Narrative: `has_personal_story`, `personal_story_type`, `pain_points_addressed`, `benefits_mentioned`
 - Quality scores (1-10): `urgency`, `authenticity`, `storytelling`, `benefit_clarity`, `emotional_appeal`, `specificity`, `humor`, `professionalism`
 - Meta: `overall_tone`, `language`, `product_positioning`, `target_audience_implied`, `social_proof`, `objection_handling`, `competitive_mention`, `price_mentioned`
+
+### Run correlation analysis (Phase 3-4)
+
+**Prerequisites**: Complete Phase 1 and Phase 2 first. You need a valid `ANTHROPIC_API_KEY` in your `.env` file.
+
+```bash
+python -m scripts.run_analysis
+```
+
+This will:
+1. **Merge** all data sources — prepared CSV (120 integrations, full funnel) + YouTube enrichment (LLM analysis)
+2. **Calculate** additional metrics — CPV, cost per purchase, funnel conversion rates, plan vs fact, engagement rate
+3. **Send** the complete dataset to Claude Opus for deep correlation analysis
+4. **Generate** `data/output/analysis_report.md` — the final analytical report
+
+Outputs:
+- `data/output/final_merged.csv` — complete merged table (~90 columns, all 120 integrations)
+- `data/output/final_merged.json` — same data in JSON (sent to Claude)
+- `data/output/analysis_report.md` — structured analytical report with recommendations
+
+#### Options
+
+```bash
+# Skip merge if final_merged.json already exists
+python -m scripts.run_analysis --skip-merge
+
+# Use a different model (default: claude-opus-4-6)
+python -m scripts.run_analysis --model claude-sonnet-4-5-20250929
+```
+
+**Note**: This step uses Claude Opus by default for deep analysis. Expected cost: ~$5-10 per run. Use `--model claude-sonnet-4-5-20250929` for a cheaper alternative.
+
+#### Calculated metrics
+
+| Metric | Formula |
+|--------|---------|
+| `cost_per_view` | Budget / Fact Reach |
+| `cost_per_contact` | Budget / Contacts Fact |
+| `cost_per_deal` | Budget / Deals Fact |
+| `cost_per_purchase` | Budget / Purchase F - TOTAL |
+| `traffic_to_contact_rate` | Contacts Fact / Traffic Fact |
+| `contact_to_deal_rate` | Deals Fact / Contacts Fact |
+| `full_funnel_conversion` | Purchase F - TOTAL / Fact Reach |
+| `engagement_rate` | (likes + comments) / views (YouTube only) |
+| `plan_vs_fact_reach` | Fact Reach / Reach Plan |
 
 ## Configuration
 
@@ -252,8 +302,8 @@ Transcripts are fetched with language fallback: Ukrainian → Russian → Englis
 
 - [x] **Phase 1**: Data preparation + YouTube parsing
 - [x] **Phase 2**: LLM enrichment (extract integration text from transcripts, analyze tone/CTA/offer)
-- [ ] **Phase 3**: Sales funnel matching (correlate content features with conversion metrics)
-- [ ] **Phase 4**: Correlation analysis via Claude Opus (find patterns between content and ROAS)
+- [x] **Phase 3**: Sales funnel matching (merge data, calculate conversion metrics)
+- [x] **Phase 4**: Correlation analysis via Claude Opus (find patterns between content and ROAS)
 - [ ] **Phase 5**: Export to Google Sheets + report generation
 
 ## Troubleshooting
