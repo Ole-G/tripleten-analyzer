@@ -40,6 +40,9 @@ tripleten-analyzer/
 │   │   ├── prompts.py            # Prompt templates for Claude
 │   │   ├── extract_integration.py # Extract ad segment from transcript
 │   │   └── analyze_content.py    # Analyze segment for content features
+│   ├── transcription/            # Audio download + Whisper (Phase 2.5)
+│   │   ├── download_audio.py     # yt-dlp wrapper for all platforms
+│   │   └── whisper_transcribe.py # OpenAI Whisper API transcription
 │   ├── analysis/                  # Correlation analysis (Phase 3-4)
 │   │   ├── prompts.py            # Analysis prompt for Claude Opus
 │   │   ├── merge_and_calculate.py # Merge data + calculate metrics
@@ -48,11 +51,14 @@ tripleten-analyzer/
 │   └── export/                    # Google Sheets export (future)
 ├── scripts/
 │   ├── data_prep.py               # Phase 1: data preparation pipeline
-│   ├── run_enrichment.py          # Phase 2: LLM enrichment pipeline
+│   ├── run_enrichment.py          # Phase 2: LLM enrichment (YouTube)
+│   ├── run_transcription.py       # Phase 2.5: download + transcribe
+│   ├── run_enrichment_reels.py    # Phase 2.5: enrich Reels/TikTok
 │   └── run_analysis.py            # Phase 3-4: correlation analysis
 ├── tests/
 │   ├── test_parsers.py            # 46 unit tests (Phase 1)
 │   ├── test_enrichment.py         # 22 unit tests (Phase 2)
+│   ├── test_transcription.py      # 14 unit tests (Phase 2.5)
 │   └── test_analysis.py           # 22 unit tests (Phase 3-4)
 ├── requirements.txt
 └── .env.example                   # API key template
@@ -63,6 +69,7 @@ tripleten-analyzer/
 - **Python 3.11+**
 - **YouTube Data API key** (free, from [Google Cloud Console](https://console.cloud.google.com/apis/credentials))
 - **Anthropic API key** (for Phase 2 enrichment and Phase 3-4 analysis — [Anthropic Console](https://console.anthropic.com/))
+- **OpenAI API key** (for Phase 2.5 Whisper transcription — [OpenAI Platform](https://platform.openai.com/api-keys))
 
 ### Getting a YouTube Data API key
 
@@ -130,7 +137,7 @@ The CSV must be semicolon-separated (`;`) with at minimum these columns: `Date`,
 pytest tests/ -v
 ```
 
-All 90 tests run without API keys (they test pure logic: URL extraction, date conversion, number parsing, URL classification, deduplication, LLM response parsing, metric calculations, etc.).
+All 104 tests run without API keys (they test pure logic: URL extraction, date conversion, number parsing, URL classification, deduplication, LLM response parsing, metric calculations, audio download, transcription, etc.).
 
 ### Run LLM enrichment (Phase 2)
 
@@ -170,6 +177,58 @@ Each video gets two enrichment steps:
 - Narrative: `has_personal_story`, `personal_story_type`, `pain_points_addressed`, `benefits_mentioned`
 - Quality scores (1-10): `urgency`, `authenticity`, `storytelling`, `benefit_clarity`, `emotional_appeal`, `specificity`, `humor`, `professionalism`
 - Meta: `overall_tone`, `language`, `product_positioning`, `target_audience_implied`, `social_proof`, `objection_handling`, `competitive_mention`, `price_mentioned`
+
+### Multi-platform transcription (Phase 2.5)
+
+Downloads audio and transcribes video content from platforms where automatic captions aren't available (Instagram Reels, TikTok, YouTube videos without captions).
+
+**Prerequisites**: Complete Phase 1 first. You need a valid `OPENAI_API_KEY` in your `.env` file and `yt-dlp` installed (included in requirements.txt).
+
+**Step 1 — Download audio & transcribe:**
+
+```bash
+python -m scripts.run_transcription --platform all
+```
+
+This will:
+1. Find all videos needing transcription (YouTube without captions, Reels, TikTok)
+2. Download audio via yt-dlp
+3. Transcribe via OpenAI Whisper API
+4. Save results:
+   - Updates `data/raw/youtube_raw.json` with Whisper transcripts
+   - Creates `data/raw/reels_raw.json` and `data/raw/tiktok_raw.json`
+
+**Step 2 — Re-run YouTube enrichment** (picks up newly transcribed videos):
+
+```bash
+python -m scripts.run_enrichment
+```
+
+**Step 3 — Enrich Reels & TikTok** (short-form: entire video is the ad):
+
+```bash
+python -m scripts.run_enrichment_reels --platform all
+```
+
+Outputs:
+- `data/enriched/reels_enriched.json` + `data/enriched/reels_enrichment_summary.csv`
+- `data/enriched/tiktok_enriched.json` + `data/enriched/tiktok_enrichment_summary.csv`
+
+#### Options
+
+```bash
+# Process only one platform
+python -m scripts.run_transcription --platform reels
+python -m scripts.run_enrichment_reels --platform tiktok
+
+# Skip download (use existing audio files)
+python -m scripts.run_transcription --skip-download
+
+# Skip transcription (download only)
+python -m scripts.run_transcription --skip-transcribe
+```
+
+**Note**: For Instagram content, yt-dlp may require browser cookies. Set `instagram_cookies_file` in `config/config.yaml` if downloads fail. Estimated cost: ~$3 total ($1.76 Whisper + $1.50 Claude enrichment).
 
 ### Run correlation analysis (Phase 3-4)
 
@@ -302,6 +361,7 @@ Transcripts are fetched with language fallback: Ukrainian → Russian → Englis
 
 - [x] **Phase 1**: Data preparation + YouTube parsing
 - [x] **Phase 2**: LLM enrichment (extract integration text from transcripts, analyze tone/CTA/offer)
+- [x] **Phase 2.5**: Multi-platform transcription & enrichment (Whisper + Reels/TikTok)
 - [x] **Phase 3**: Sales funnel matching (merge data, calculate conversion metrics)
 - [x] **Phase 4**: Correlation analysis via Claude Opus (find patterns between content and ROAS)
 - [ ] **Phase 5**: Export to Google Sheets + report generation

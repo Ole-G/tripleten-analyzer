@@ -7,6 +7,10 @@ python-dotenv>=1.0.0
 PyYAML>=6.0.1
 isodate>=0.6.1
 
+# Transcription
+openai>=1.0.0
+yt-dlp>=2024.0.0
+
 # Export / Sheets
 gspread>=5.12.0
 google-auth>=2.23.0
