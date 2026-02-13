@@ -66,3 +66,8 @@ analysis:
   model: "claude-opus-4-6"  # Opus for deep analysis
   max_tokens: 16384
   # exclude_fields: uses DEFAULT_EXCLUDE_FIELDS from correlation_analysis.py
+
+textual_analysis:
+  checkpoint_interval: 10
+  # Max integration text length to send for textual analysis
+  max_text_length: 5000
