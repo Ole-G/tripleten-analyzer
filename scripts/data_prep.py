@@ -194,6 +194,24 @@ def validate_input(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """
     warnings: list[str] = []
 
+    # 0. Normalize column names: strip embedded newlines and fix corruption
+    original_names = list(df.columns)
+    normalized = []
+    for col in original_names:
+        c = col.replace("\r\n", " ").replace("\n", " ")
+        # Fix known corruption: ? → C (e.g., "?R Call" → "CR Call")
+        # and ? → m (e.g., "?onth" → "month", "???" → "month")
+        c = re.sub(r'\?onth', 'month', c)
+        c = re.sub(r'\?\?\?', 'month', c)
+        c = re.sub(r'\?R Call', 'CR Call', c)
+        # Collapse multiple spaces
+        c = re.sub(r'\s+', ' ', c).strip()
+        normalized.append(c)
+    df.columns = normalized
+    renamed = sum(1 for a, b in zip(original_names, normalized) if a != b)
+    if renamed > 0:
+        warnings.append(f"Normalized {renamed} column names (stripped newlines, fixed corruption)")
+
     # 1. Check required columns
     missing = set(REQUIRED_COLUMNS) - set(df.columns)
     if missing:

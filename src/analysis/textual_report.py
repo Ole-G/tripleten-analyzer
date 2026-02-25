@@ -8,6 +8,7 @@ import time
 import anthropic
 
 from src.analysis.prompts import TEXTUAL_REPORT_PROMPT
+from src.analysis.textual_aggregation_tables import compute_all_textual_tables
 
 logger = logging.getLogger(__name__)
 
@@ -124,11 +125,16 @@ def generate_textual_report(
         integration_context, ensure_ascii=False, separators=(",", ":"), default=str,
     )
 
+    # Compute pre-aggregated textual tables from comparison data
+    precomputed_textual_tables = compute_all_textual_tables(textual_comparison)
+    logger.info("Pre-computed textual tables: %d chars", len(precomputed_textual_tables))
+
     # Format prompt
     prompt = TEXTUAL_REPORT_PROMPT.format(
         existing_report=existing_report,
         textual_comparison_json=comparison_json,
         integration_context_json=context_json,
+        precomputed_textual_tables=precomputed_textual_tables,
     )
 
     logger.info("Prompt size: ~%dk chars", len(prompt) // 1000)

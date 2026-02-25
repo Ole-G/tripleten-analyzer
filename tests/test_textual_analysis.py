@@ -76,15 +76,6 @@ def _valid_textual_response() -> dict:
         "rhetorical_questions": [
             "Have you ever felt stuck in your career?",
         ],
-        "text_stats": {
-            "word_count": 245,
-            "sentence_count": 18,
-            "question_count": 3,
-            "exclamation_count": 2,
-            "first_person_count": 8,
-            "second_person_count": 12,
-            "product_name_mentions": 3,
-        },
     }
 
 
@@ -106,7 +97,19 @@ def _make_enriched_record(
         },
     }
     if has_textual:
-        record["enrichment"]["textual"] = _valid_textual_response()
+        textual = _valid_textual_response()
+        # In production, extract_textual_features() merges code-computed
+        # text_stats into the LLM response. Mimic that here:
+        textual["text_stats"] = {
+            "word_count": 245,
+            "sentence_count": 18,
+            "question_count": 3,
+            "exclamation_count": 2,
+            "first_person_count": 8,
+            "second_person_count": 12,
+            "product_name_mentions": 3,
+        }
+        record["enrichment"]["textual"] = textual
     return record
 
 
@@ -141,16 +144,19 @@ class TestExtractTextualFeatures:
         mock_message.content = [MagicMock(text=json.dumps(_valid_textual_response()))]
         mock_client.messages.create.return_value = mock_message
 
+        integration_text = "Some ad text about TripleTen."
         result = extract_textual_features(
-            integration_text="Some ad text about TripleTen.",
+            integration_text=integration_text,
             client=mock_client,
             model="claude-sonnet-4-5-20250929",
         )
 
         assert "error" not in result
         assert "opening_pattern" in result
+        # text_stats is now code-computed, not from LLM
         assert "text_stats" in result
-        assert result["text_stats"]["word_count"] == 245
+        assert result["text_stats"]["word_count"] == 5  # "Some ad text about TripleTen."
+        assert result["text_stats"]["product_name_mentions"] == 1
 
     def test_extraction_with_markdown_fencing(self):
         """Response wrapped in ```json ... ``` is parsed correctly."""
@@ -210,7 +216,8 @@ class TestExtractTextualFeatures:
         )
 
         assert "error" not in result
-        assert result["text_stats"]["word_count"] == 245
+        # text_stats is code-computed from "Ad text."
+        assert result["text_stats"]["word_count"] == 2
 
 
 # ---------------------------------------------------------------------------
@@ -232,13 +239,12 @@ class TestValidateTextualResult:
         with pytest.raises(ValueError, match="Missing required keys"):
             _validate_textual_result(data)
 
-    def test_validation_fails_on_missing_text_stats(self):
-        """Missing text_stats keys raises ValueError."""
+    def test_validation_ignores_text_stats(self):
+        """text_stats is NOT validated by LLM validator (it's code-computed)."""
         data = _valid_textual_response()
-        del data["text_stats"]["word_count"]
-        del data["text_stats"]["sentence_count"]
-        with pytest.raises(ValueError, match="Missing text_stats keys"):
-            _validate_textual_result(data)
+        # Even without text_stats, validation passes (it's added by code later)
+        data.pop("text_stats", None)
+        _validate_textual_result(data)  # should not raise
 
 
 # ---------------------------------------------------------------------------
@@ -537,16 +543,19 @@ class TestPromptFormatting:
         )
         assert "Sample ad text" in result
         assert "opening_pattern" in result
-        assert "text_stats" in result
+        # text_stats removed from prompt — now computed by code
+        assert "text_stats" not in result
 
     def test_textual_report_prompt_formats(self):
-        """TEXTUAL_REPORT_PROMPT formats with all three placeholders."""
+        """TEXTUAL_REPORT_PROMPT formats with all placeholders."""
         result = TEXTUAL_REPORT_PROMPT.format(
             existing_report="# Existing Report\nKey findings...",
             textual_comparison_json='{"sample_sizes": {"with_purchases": 10}}',
             integration_context_json='[{"Name": "TestChannel"}]',
+            precomputed_textual_tables="## PRE-COMPUTED TABLES\n| Metric | Value |\n",
         )
         assert "Existing Report" in result
         assert "sample_sizes" in result
         assert "TestChannel" in result
         assert "Opening Patterns That Convert" in result
+        assert "PRE-COMPUTED" in result

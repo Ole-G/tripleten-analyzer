@@ -316,13 +316,18 @@ class TestPrepareDataForClaude:
 class TestAnalysisPrompt:
     def test_prompt_formats(self):
         result = CORRELATION_ANALYSIS_PROMPT.format(
-            data_json='[{"video_id": "abc"}]'
+            data_json='[{"video_id": "abc"}]',
+            precomputed_tables='## PRE-COMPUTED TABLES\n| Metric | Value |',
         )
         assert "abc" in result
         assert "CORRELATIONS" in result
+        assert "PRE-COMPUTED" in result
 
     def test_prompt_contains_all_sections(self):
-        result = CORRELATION_ANALYSIS_PROMPT.format(data_json="[]")
+        result = CORRELATION_ANALYSIS_PROMPT.format(
+            data_json="[]",
+            precomputed_tables="",
+        )
         for section in [
             "CONTENT", "FUNNEL", "PLATFORMS", "NICHES",
             "BUDGET", "MANAGERS", "SUCCESS", "ANOMALIES", "RECOMMENDATIONS",
@@ -335,8 +340,17 @@ class TestAnalysisPrompt:
 
 class TestCorrelationAnalysis:
     def test_successful_analysis(self, tmp_path):
-        # Create test data JSON
-        data = [{"video_id": "abc", "Budget": 5000}]
+        # Create test data JSON with required columns for aggregation tables
+        data = [{
+            "video_id": "abc",
+            "Budget": 5000,
+            "Format": "youtube",
+            "Manager": "TestManager",
+            "has_purchases": True,
+            "Purchase F - TOTAL": 3,
+            "cost_per_purchase": 1666.67,
+            "Topic": "Career",
+        }]
         json_path = tmp_path / "data.json"
         with open(json_path, "w") as f:
             json.dump(data, f)
@@ -357,7 +371,11 @@ class TestCorrelationAnalysis:
         client.messages.create.assert_called_once()
 
     def test_report_saved_to_file(self, tmp_path):
-        data = [{"video_id": "abc"}]
+        data = [{
+            "video_id": "abc", "Budget": 5000, "Format": "youtube",
+            "Manager": "M", "has_purchases": False,
+            "Purchase F - TOTAL": 0, "Topic": "Tech",
+        }]
         json_path = tmp_path / "data.json"
         with open(json_path, "w") as f:
             json.dump(data, f)
@@ -376,7 +394,11 @@ class TestCorrelationAnalysis:
         assert saved == "Report content here"
 
     def test_model_passed_to_api(self, tmp_path):
-        data = [{"video_id": "abc"}]
+        data = [{
+            "video_id": "abc", "Budget": 5000, "Format": "youtube",
+            "Manager": "M", "has_purchases": True,
+            "Purchase F - TOTAL": 1, "Topic": "Tech",
+        }]
         json_path = tmp_path / "data.json"
         with open(json_path, "w") as f:
             json.dump(data, f)

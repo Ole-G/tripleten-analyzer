@@ -233,6 +233,18 @@ all textual findings. Include required elements, optional elements, and forbidde
 - Include percentages and counts, not just qualitative statements
 - Bold the most important findings
 
+## PRE-COMPUTED TEXTUAL TABLES
+The following tables have been calculated by code from the raw data.
+Use these EXACT numbers in your report — do NOT recalculate sums, counts, averages,
+or rates yourself as your in-context arithmetic is unreliable.
+Your task is to INTERPRET and ANALYZE these pre-computed numbers.
+
+When writing tables in your report, copy the pre-computed numbers directly.
+If you need additional breakdowns not covered here, you may derive from the
+comparison data below, but clearly label them as "approximate."
+
+{precomputed_textual_tables}
+
 ## INPUTS
 
 ### EXISTING ANALYSIS REPORT

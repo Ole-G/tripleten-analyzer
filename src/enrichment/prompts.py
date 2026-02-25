@@ -150,16 +150,7 @@ Return ONLY a valid JSON object with these exact fields:
     ],
     "rhetorical_questions": [
         "<any rhetorical questions used in the integration>"
-    ],
-    "text_stats": {{
-        "word_count": <total words in integration>,
-        "sentence_count": <total sentences>,
-        "question_count": <number of questions asked>,
-        "exclamation_count": <number of exclamatory sentences>,
-        "first_person_count": <number of times 'I', 'my', 'me' used>,
-        "second_person_count": <number of times 'you', 'your' used>,
-        "product_name_mentions": <how many times 'TripleTen' or 'Triple Ten' mentioned>
-    }}
+    ]
 }}
 
 Return ONLY the JSON object, no additional text or markdown fencing."""

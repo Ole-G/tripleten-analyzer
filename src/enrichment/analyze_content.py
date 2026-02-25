@@ -24,6 +24,27 @@ _SCORE_KEYS = {
     "emotional_appeal", "specificity", "humor", "professionalism",
 }
 
+# Valid enum values for categorical fields
+_VALID_OFFER_TYPES = {
+    "free_consultation", "free_course", "trial", "promo_code",
+    "discount", "bootcamp", "career_change", "other",
+}
+
+_VALID_TONES = {
+    "professional", "casual", "enthusiastic", "educational",
+    "humorous", "inspirational", "conversational", "mixed",
+}
+
+_VALID_CTA_TYPES = {
+    "link_click", "promo_code", "sign_up", "consultation",
+    "download", "other",
+}
+
+_VALID_LANDING_TYPES = {
+    "website", "landing_page", "consultation_form", "app",
+    "promo_page", "other",
+}
+
 
 def _strip_markdown_fencing(text: str) -> str:
     """Remove ```json ... ``` wrapping if present."""
@@ -63,6 +84,35 @@ def _clamp_scores(data: dict) -> dict:
             except (ValueError, TypeError):
                 scores[key] = 5  # default if unparseable
     data["scores"] = scores
+    return data
+
+
+def _normalize_enums(data: dict) -> dict:
+    """Normalize categorical fields to valid enum values.
+
+    Invalid values are replaced with defaults and logged as warnings.
+    """
+    _ENUM_FIELDS = {
+        "offer_type": (_VALID_OFFER_TYPES, "other"),
+        "overall_tone": (_VALID_TONES, "mixed"),
+        "cta_type": (_VALID_CTA_TYPES, "other"),
+        "landing_type": (_VALID_LANDING_TYPES, "other"),
+    }
+
+    for field, (valid_set, default) in _ENUM_FIELDS.items():
+        val = data.get(field)
+        if val is not None:
+            val_lower = str(val).lower().strip()
+            if val_lower not in valid_set:
+                logger.warning(
+                    "Unexpected %s value '%s', normalizing to '%s'. "
+                    "Valid values: %s",
+                    field, val, default, sorted(valid_set),
+                )
+                data[field] = default
+            else:
+                data[field] = val_lower  # normalize casing
+
     return data
 
 
@@ -107,6 +157,7 @@ def analyze_content(
             data = json.loads(cleaned)
             _validate_analysis_result(data)
             data = _clamp_scores(data)
+            data = _normalize_enums(data)
             return data
 
         except anthropic.RateLimitError as e:

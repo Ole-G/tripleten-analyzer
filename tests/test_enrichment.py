@@ -23,6 +23,7 @@ from src.enrichment.extract_integration import (
 from src.enrichment.analyze_content import (
     analyze_content,
     _validate_analysis_result,
+    _normalize_enums,
 )
 
 
@@ -54,8 +55,8 @@ def _valid_analysis_response() -> dict:
     return {
         "offer_type": "discount",
         "offer_details": "40% off first month",
-        "landing_type": "programs_page",
-        "cta_type": "link_in_description",
+        "landing_type": "landing_page",
+        "cta_type": "link_click",
         "cta_urgency": "high",
         "cta_text": "Click the link in the description!",
         "has_personal_story": True,
@@ -257,6 +258,45 @@ class TestValidation:
         data["scores"] = {"urgency": 5}  # incomplete
         with pytest.raises(ValueError, match="Missing score dimensions"):
             _validate_analysis_result(data)
+
+
+# ── Enum normalization ────────────────────────────────────────
+
+
+class TestNormalizeEnums:
+    def test_valid_enums_pass_through(self):
+        data = _valid_analysis_response()
+        result = _normalize_enums(data)
+        assert result["offer_type"] == "discount"
+        assert result["overall_tone"] == "enthusiastic"
+        assert result["cta_type"] == "link_click"
+        assert result["landing_type"] == "landing_page"
+
+    def test_invalid_offer_type_normalized(self):
+        data = _valid_analysis_response()
+        data["offer_type"] = "weird_unknown_type"
+        result = _normalize_enums(data)
+        assert result["offer_type"] == "other"
+
+    def test_invalid_tone_normalized(self):
+        data = _valid_analysis_response()
+        data["overall_tone"] = "aggressive_selling"
+        result = _normalize_enums(data)
+        assert result["overall_tone"] == "mixed"
+
+    def test_invalid_cta_type_normalized(self):
+        data = _valid_analysis_response()
+        data["cta_type"] = "unknown_cta"
+        result = _normalize_enums(data)
+        assert result["cta_type"] == "other"
+
+    def test_case_normalization(self):
+        data = _valid_analysis_response()
+        data["offer_type"] = "Discount"
+        data["overall_tone"] = "ENTHUSIASTIC"
+        result = _normalize_enums(data)
+        assert result["offer_type"] == "discount"
+        assert result["overall_tone"] == "enthusiastic"
 
 
 # ── Resume logic ──────────────────────────────────────────────

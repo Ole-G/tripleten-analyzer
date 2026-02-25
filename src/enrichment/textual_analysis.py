@@ -1,4 +1,9 @@
-"""Extract granular textual features from ad integration text via Claude."""
+"""Extract granular textual features from ad integration text via Claude.
+
+Text statistics (word count, sentence count, pronoun counts, etc.) are now
+computed by Python code in src.utils.text_stats rather than by the LLM,
+which is unreliable at counting.
+"""
 
 import json
 import logging
@@ -8,36 +13,28 @@ import anthropic
 
 from src.enrichment.analyze_content import _strip_markdown_fencing
 from src.enrichment.prompts import TEXTUAL_ANALYSIS_PROMPT
+from src.utils.text_stats import compute_text_stats
 
 logger = logging.getLogger(__name__)
 
+# Keys expected from the LLM (qualitative features only — no text_stats)
 _REQUIRED_TEXTUAL_KEYS = {
     "opening_pattern", "closing_pattern", "transition",
     "persuasion_phrases", "benefit_framings", "pain_point_framings",
     "cta_phrases", "specificity_markers", "emotional_triggers",
-    "rhetorical_questions", "text_stats",
-}
-
-_REQUIRED_TEXT_STATS_KEYS = {
-    "word_count", "sentence_count", "question_count",
-    "exclamation_count", "first_person_count", "second_person_count",
-    "product_name_mentions",
+    "rhetorical_questions",
 }
 
 
 def _validate_textual_result(data: dict) -> None:
-    """Raise ValueError if required keys or text_stats fields are missing."""
+    """Raise ValueError if required qualitative keys are missing.
+
+    Note: text_stats is no longer validated here — it is computed by
+    Python code and merged after LLM response.
+    """
     missing = _REQUIRED_TEXTUAL_KEYS - set(data.keys())
     if missing:
         raise ValueError(f"Missing required keys in textual result: {missing}")
-
-    text_stats = data.get("text_stats", {})
-    if not isinstance(text_stats, dict):
-        raise ValueError("'text_stats' must be a dict")
-
-    missing_stats = _REQUIRED_TEXT_STATS_KEYS - set(text_stats.keys())
-    if missing_stats:
-        raise ValueError(f"Missing text_stats keys: {missing_stats}")
 
     # Validate list fields
     for key in ("persuasion_phrases", "benefit_framings", "pain_point_framings",
@@ -87,6 +84,9 @@ def extract_textual_features(
             cleaned = _strip_markdown_fencing(raw_response)
             data = json.loads(cleaned)
             _validate_textual_result(data)
+
+            # Merge code-computed text statistics (replaces LLM counting)
+            data["text_stats"] = compute_text_stats(integration_text)
             return data
 
         except anthropic.RateLimitError as e:

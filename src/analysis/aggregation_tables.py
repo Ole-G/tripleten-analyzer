@@ -332,6 +332,44 @@ def compute_budget_tiers(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def compute_niche_performance(df: pd.DataFrame) -> str:
+    """Section 4.1: Niche (Topic) performance summary."""
+    lines = ["### Pre-computed Table 4.1: Niche Performance\n"]
+
+    col = "Topic"
+    if col not in df.columns:
+        lines.append("*No Topic data available.*\n")
+        return "\n".join(lines)
+
+    lines.append("| Niche | Count | Total Budget | Integrations w/ Purchases | "
+                 "Total Purchases | Purchase Rate | Avg CPP |")
+    lines.append("|---|---|---|---|---|---|---|")
+
+    for niche in sorted(df[col].dropna().unique()):
+        subset = df[df[col] == niche]
+        count = len(subset)
+        if count < 2:
+            continue  # skip singletons for cleaner output
+        total_budget = subset["Budget"].sum()
+        winners = subset[subset["has_purchases"] == True]
+        n_with = len(winners)
+        total_p = subset["Purchase F - TOTAL"].fillna(0).sum()
+        rate = n_with / count if count > 0 else 0
+
+        if n_with > 0 and "cost_per_purchase" in subset.columns:
+            avg_cpp = winners["cost_per_purchase"].dropna().mean()
+        else:
+            avg_cpp = np.nan
+
+        lines.append(
+            f"| {niche} | {count} | {_money(total_budget)} | "
+            f"{n_with} | {int(total_p)} | {_pct(rate)} | {_money(avg_cpp)} |"
+        )
+
+    lines.append("")
+    return "\n".join(lines)
+
+
 def compute_manager_performance(df: pd.DataFrame) -> str:
     """Section 6.1: Manager performance comparison."""
     lines = ["### Pre-computed Table 6.1: Manager Performance\n"]
@@ -364,6 +402,61 @@ def compute_manager_performance(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def compute_anomaly_summary(df: pd.DataFrame) -> str:
+    """Section 8.1: Anomaly summary — unusual data patterns."""
+    lines = ["### Pre-computed Table 8.1: Anomalies\n"]
+
+    # High reach but 0 or very low traffic
+    if "Fact Reach" in df.columns and "Traffic Fact" in df.columns:
+        high_reach = df[
+            (df["Fact Reach"].fillna(0) > 10000) &
+            (df["Traffic Fact"].fillna(0) < 100)
+        ]
+        lines.append(f"**High reach (>10K) but near-zero traffic (<100):** {len(high_reach)} integrations")
+        if not high_reach.empty:
+            for _, row in high_reach.head(5).iterrows():
+                lines.append(
+                    f"- {row.get('Name', 'N/A')} ({row.get('Format', '?')}): "
+                    f"reach={int(row.get('Fact Reach', 0)):,}, "
+                    f"traffic={int(row.get('Traffic Fact', 0)):,}, "
+                    f"budget={_money(row.get('Budget', 0))}"
+                )
+        lines.append("")
+
+    # Purchases at minimal budget (< $2000)
+    low_budget_winners = df[
+        (df["Budget"].fillna(0) < 2000) &
+        (df["has_purchases"] == True)
+    ]
+    lines.append(f"**Low budget (<$2K) with purchases:** {len(low_budget_winners)} integrations")
+    if not low_budget_winners.empty:
+        for _, row in low_budget_winners.iterrows():
+            lines.append(
+                f"- {row.get('Name', 'N/A')} ({row.get('Format', '?')}): "
+                f"budget={_money(row.get('Budget', 0))}, "
+                f"purchases={int(row.get('Purchase F - TOTAL', 0))}, "
+                f"CPP={_money(row.get('cost_per_purchase'))}"
+            )
+    lines.append("")
+
+    # High budget (>$5K) with zero purchases
+    high_budget_losers = df[
+        (df["Budget"].fillna(0) > 5000) &
+        (df["has_purchases"] == False)
+    ]
+    lines.append(f"**High budget (>$5K) with zero purchases:** {len(high_budget_losers)} integrations")
+    if not high_budget_losers.empty:
+        for _, row in high_budget_losers.head(10).iterrows():
+            lines.append(
+                f"- {row.get('Name', 'N/A')} ({row.get('Format', '?')}): "
+                f"budget={_money(row.get('Budget', 0))}, "
+                f"reach={int(row.get('Fact Reach', 0) or 0):,}"
+            )
+    lines.append("")
+
+    return "\n".join(lines)
+
+
 def compute_all_tables(df: pd.DataFrame) -> str:
     """Compute all pre-aggregated tables and return combined markdown.
 
@@ -383,8 +476,10 @@ def compute_all_tables(df: pd.DataFrame) -> str:
         compute_integration_position(df),
         compute_funnel_conversion_rates(df),
         compute_platform_performance(df),
+        compute_niche_performance(df),
         compute_budget_tiers(df),
         compute_manager_performance(df),
+        compute_anomaly_summary(df),
     ]
 
     header = (
@@ -399,3 +494,4 @@ def compute_all_tables(df: pd.DataFrame) -> str:
     )
 
     return header + "\n---\n\n".join(sections)
+

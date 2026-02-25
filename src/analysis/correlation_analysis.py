@@ -14,6 +14,7 @@ from src.analysis.aggregation_tables import compute_all_tables
 logger = logging.getLogger(__name__)
 
 # Fields to exclude from data sent to Claude (too long, waste tokens)
+# NOTE: Column names are normalized by data_prep.py (no \r\n, no ? corruption)
 DEFAULT_EXCLUDE_FIELDS = [
     "transcript_full",
     "transcript_text",
@@ -41,26 +42,26 @@ DEFAULT_EXCLUDE_FIELDS = [
     "Contacts Plan",
     "CPContact Plan",
     "CPContact Fact",
-    "CR1 Contact - deal\r\nPlan",
-    "CR1 Contact - deal \r\nFact",
+    "CR1 Contact - deal Plan",
+    "CR1 Contact - deal Fact",
     "Deals Plan",
     "CR3 Deal > call Plan",
     "CR3 Deal > call Fact",
     "Calls Plan",
-    "CR4 Call - GTC\r\nFact",
+    "CR4 Call - GTC Fact",
     "GTC ? Plan",
     "GTC ? Fact",
-    "?R Call > Purchase P  - 1 month",
-    "?R Call > Purchase F  - 1 month",
+    "CR Call > Purchase P - 1 month",
+    "CR Call > Purchase F - 1 month",
     "Purchase P - 1 month",
-    "CMC P - 1 ???",
+    "CMC P - 1 month",
     "CMC F - 1 month",
-    "Purchase F - 2 ?onth",
-    "CMC F - \r\n2 ?onth",
-    "Purchase F - \r\n3 ?onth",
-    "CMC F - \r\n3 ?onth",
-    "Purchase F - \r\n6 ?onth",
-    "CMC F - \r\n6 ?onth",
+    "Purchase F - 2 month",
+    "CMC F - 2 month",
+    "Purchase F - 3 month",
+    "CMC F - 3 month",
+    "Purchase F - 6 month",
+    "CMC F - 6 month",
 ]
 
 
