@@ -69,6 +69,19 @@ c) Recommended budget split by platforms and niches
 d) 3 specific hypotheses for A/B testing
 e) Which bloggers deserve re-ordering and why
 
+## PRE-COMPUTED TABLES
+The following tables have been calculated by code (pandas) from the raw data.
+Use these EXACT numbers in your report — do NOT recalculate sums, counts, averages,
+or rates yourself as your in-context arithmetic is unreliable on large datasets.
+Your task is to INTERPRET and ANALYZE these pre-computed numbers, find patterns,
+cross-reference between tables, and generate actionable insights.
+
+When writing tables in your report, copy the pre-computed numbers directly.
+If you need additional breakdowns not covered here, you may calculate from the
+raw data below, but clearly label them as "estimated" or "approximate."
+
+{precomputed_tables}
+
 ## RESPONSE FORMAT
 Structured analytical report with:
 - Executive Summary (key findings in 5 points)
@@ -79,7 +92,7 @@ Structured analytical report with:
 
 Respond in English (TripleTen team is international).
 
-## DATA
+## RAW DATA (for qualitative analysis and individual case references)
 {data_json}"""
 
 

@@ -6,8 +6,10 @@ import math
 import time
 
 import anthropic
+import pandas as pd
 
 from src.analysis.prompts import CORRELATION_ANALYSIS_PROMPT
+from src.analysis.aggregation_tables import compute_all_tables
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +140,14 @@ def run_correlation_analysis(
 
     logger.info("Loaded %d records from %s", len(records), data_json_path)
 
+    # Pre-compute aggregation tables using pandas
+    df = pd.DataFrame(records)
+    precomputed_tables = compute_all_tables(df)
+    logger.info(
+        "Pre-computed aggregation tables: %d chars",
+        len(precomputed_tables),
+    )
+
     # Prepare data for Claude (remove long fields)
     cleaned = _prepare_data_for_claude(records, exclude_fields)
     data_str = json.dumps(cleaned, ensure_ascii=False, separators=(",", ":"), default=str)
@@ -148,7 +158,10 @@ def run_correlation_analysis(
     )
 
     # Format prompt
-    prompt = CORRELATION_ANALYSIS_PROMPT.format(data_json=data_str)
+    prompt = CORRELATION_ANALYSIS_PROMPT.format(
+        data_json=data_str,
+        precomputed_tables=precomputed_tables,
+    )
 
     # Call Claude API with retry
     last_error = None
