@@ -77,8 +77,9 @@ def _build_reels_items(config: dict) -> list[dict]:
     df = pd.read_csv(csv_path)
     reels = df[df["url_type"] == "instagram_reel"]
 
-    # Check for existing reels_raw.json to support resume
-    raw_path = Path(config["paths"]["raw_dir"]) / "reels_raw.json"
+    # Check for existing reel_raw.json to support resume
+    # Note: _save_platform_raw strips 'instagram_' prefix → 'reel_raw.json'
+    raw_path = Path(config["paths"]["raw_dir"]) / "reel_raw.json"
     existing_ids = set()
     if raw_path.exists():
         with open(raw_path, "r", encoding="utf-8") as f:
