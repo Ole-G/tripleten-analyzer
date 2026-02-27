@@ -286,7 +286,7 @@ def main(platform: str = "all") -> None:
         if p == "reels":
             logger.info("Processing Instagram Reels...")
             _process_platform(
-                raw_path=raw_dir / "reels_raw.json",
+                raw_path=raw_dir / "reel_raw.json",
                 output_json_path=enriched_dir / "reels_enriched.json",
                 output_csv_path=enriched_dir / "reels_enrichment_summary.csv",
                 client=client,

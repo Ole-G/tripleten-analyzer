@@ -264,11 +264,19 @@ def validate_input(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
         df = df[df["Format"].isin(SUPPORTED_FORMATS)].copy()
 
     # 8. Deduplicate by (Name + Ad link)
+    # Important: some duplicates have funnel data (purchases) while copies have none.
+    # Sort by purchases descending so we keep the integration with actual funnel data.
+    if "Purchase F - TOTAL" in df.columns:
+        df = df.sort_values(by="Purchase F - TOTAL", ascending=False)
+        
     before_dedup = len(df)
     df = df.drop_duplicates(subset=["Name", "Ad link"], keep="first")
     n_dupes = before_dedup - len(df)
     if n_dupes > 0:
-        warnings.append(f"Removed {n_dupes} duplicate rows (by Name + Ad link)")
+        warnings.append(
+            f"Removed {n_dupes} duplicate rows (by Name + Ad link), "
+            "preserving rows with highest 'Purchase F - TOTAL' where available."
+        )
 
     df = df.reset_index(drop=True)
 

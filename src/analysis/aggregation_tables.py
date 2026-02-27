@@ -286,9 +286,9 @@ def compute_platform_performance(df: pd.DataFrame) -> str:
         total_purchases = subset["Purchase F - TOTAL"].fillna(0).sum()
         purchase_rate = n_with_purchases / count if count > 0 else 0
 
-        # Avg CPP only among those with purchases
-        if n_with_purchases > 0 and "cost_per_purchase" in subset.columns:
-            avg_cpp = winners["cost_per_purchase"].dropna().mean()
+        # Avg CPP only among those with purchases (total winning spend / total purchases)
+        if n_with_purchases > 0 and total_purchases > 0:
+            avg_cpp = winners["Budget"].sum() / total_purchases
         else:
             avg_cpp = np.nan
 
@@ -318,8 +318,8 @@ def compute_budget_tiers(df: pd.DataFrame) -> str:
         total_p = subset["Purchase F - TOTAL"].fillna(0).sum()
         rate = n_with / count if count > 0 else 0
 
-        if n_with > 0 and "cost_per_purchase" in subset.columns:
-            avg_cpp = winners["cost_per_purchase"].dropna().mean()
+        if n_with > 0 and total_p > 0:
+            avg_cpp = subset[subset["has_purchases"] == True]["Budget"].sum() / total_p
         else:
             avg_cpp = np.nan
 
@@ -356,8 +356,8 @@ def compute_niche_performance(df: pd.DataFrame) -> str:
         total_p = subset["Purchase F - TOTAL"].fillna(0).sum()
         rate = n_with / count if count > 0 else 0
 
-        if n_with > 0 and "cost_per_purchase" in subset.columns:
-            avg_cpp = winners["cost_per_purchase"].dropna().mean()
+        if n_with > 0 and total_p > 0:
+            avg_cpp = winners["Budget"].sum() / total_p
         else:
             avg_cpp = np.nan
 
@@ -388,8 +388,8 @@ def compute_manager_performance(df: pd.DataFrame) -> str:
         total_p = subset["Purchase F - TOTAL"].fillna(0).sum()
         rate = n_with / count if count > 0 else 0
 
-        if n_with > 0 and "cost_per_purchase" in subset.columns:
-            avg_cpp = winners["cost_per_purchase"].dropna().mean()
+        if n_with > 0 and total_p > 0:
+            avg_cpp = winners["Budget"].sum() / total_p
         else:
             avg_cpp = np.nan
 

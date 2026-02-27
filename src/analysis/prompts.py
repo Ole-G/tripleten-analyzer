@@ -11,7 +11,13 @@ Each record contains:
 - METADATA: platform, blogger niche, manager, date
 - CALCULATED METRICS: CPV, CPC, funnel conversion rates, etc.
 
-Total: 120 unique integrations, of which only ~26 have purchases (Purchase F - TOTAL > 0).
+Total: 120 unique integrations (deduplicated from 134 raw rows by preserving the highest 'Purchase F - TOTAL').
+Of these, only ~23 have purchases (where 'Purchase F - TOTAL' > 0).
+
+**IMPORTANT DEFINITIONS:**
+- **Purchases:** All purchase counts and conversion rates must use the `Purchase F - TOTAL` column. Do NOT use any 1-month or 2-month columns.
+- **CPP (Cost Per Purchase):** Calculated as matching group's Total Budget ÷ Total Purchases.
+- **Metadata Verification:** Before naming specific integrations (e.g. 'moschinodorito', 'overgenpoverty'), you MUST check the raw data to ensure you assign them the correct Manager and Format (e.g., Reel vs Story). Do not hallucinate cross-attributions.
 
 ## ANALYSIS TASKS
 

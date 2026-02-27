@@ -270,6 +270,129 @@ class TestMergeAllData:
         assert len(result) == 3
         assert "cost_per_view" in result.columns
 
+    def test_merge_with_multiplatform_enrichment(self, tmp_path):
+        """Verify Reels/TikTok enrichment is merged alongside YouTube."""
+        df = _make_test_df()
+        csv_path = tmp_path / "prepared.csv"
+        df.to_csv(csv_path, index=False)
+
+        # YouTube enriched
+        yt_enriched = [{
+            "video_id": "abc123",
+            "url": "https://youtu.be/abc123",
+            "view_count": 10000,
+            "enrichment": {
+                "extraction": {
+                    "integration_text": "Check out TripleTen!",
+                    "integration_start_sec": 331,
+                    "integration_duration_sec": 90,
+                    "integration_position": "middle",
+                    "is_full_video_ad": False,
+                },
+                "analysis": {
+                    "offer_type": "discount",
+                    "offer_details": "40% off",
+                    "landing_type": "website",
+                    "cta_type": "link_click",
+                    "cta_urgency": "high",
+                    "cta_text": "Click the link!",
+                    "has_personal_story": True,
+                    "personal_story_type": "career_change",
+                    "pain_points_addressed": [],
+                    "benefits_mentioned": [],
+                    "objection_handling": True,
+                    "social_proof": "statistics",
+                    "overall_tone": "enthusiastic",
+                    "language": "en",
+                    "product_positioning": "career_change",
+                    "target_audience_implied": "young pros",
+                    "competitive_mention": False,
+                    "price_mentioned": True,
+                    "scores": {
+                        "urgency": 8, "authenticity": 7,
+                        "storytelling": 6, "benefit_clarity": 9,
+                        "emotional_appeal": 7, "specificity": 8,
+                        "humor": 3, "professionalism": 6,
+                    },
+                },
+            },
+        }]
+
+        # Reels enriched
+        reels_enriched = [{
+            "video_id": "xyz789",
+            "url": "https://instagram.com/reel/xyz789/",
+            "platform": "reels",
+            "enrichment": {
+                "extraction": {
+                    "integration_text": "Full reel ad text",
+                    "integration_start_sec": 0,
+                    "integration_duration_sec": 30,
+                    "integration_position": "full_video",
+                    "is_full_video_ad": True,
+                },
+                "analysis": {
+                    "offer_type": "free_consultation",
+                    "offer_details": "Free career consultation",
+                    "landing_type": "consultation_form",
+                    "cta_type": "sign_up",
+                    "cta_urgency": "medium",
+                    "cta_text": "Sign up now",
+                    "has_personal_story": False,
+                    "personal_story_type": None,
+                    "pain_points_addressed": ["career switch"],
+                    "benefits_mentioned": ["free"],
+                    "objection_handling": False,
+                    "social_proof": None,
+                    "overall_tone": "casual",
+                    "language": "uk",
+                    "product_positioning": "bootcamp",
+                    "target_audience_implied": "students",
+                    "competitive_mention": False,
+                    "price_mentioned": False,
+                    "scores": {
+                        "urgency": 5, "authenticity": 8,
+                        "storytelling": 4, "benefit_clarity": 7,
+                        "emotional_appeal": 6, "specificity": 5,
+                        "humor": 2, "professionalism": 7,
+                    },
+                },
+            },
+        }]
+
+        yt_json = tmp_path / "youtube_enriched.json"
+        reels_json = tmp_path / "reels_enriched.json"
+        with open(yt_json, "w") as f:
+            json.dump(yt_enriched, f)
+        with open(reels_json, "w") as f:
+            json.dump(reels_enriched, f)
+
+        output_dir = str(tmp_path / "output")
+        result = merge_all_data(
+            prepared_csv_path=str(csv_path),
+            enriched_json_path=str(yt_json),
+            reels_enriched_json_path=str(reels_json),
+            tiktok_enriched_json_path=str(tmp_path / "nonexistent.json"),
+            output_dir=output_dir,
+        )
+
+        assert len(result) == 3
+
+        # YouTube row has YouTube enrichment
+        yt_row = result[result["Name"] == "blogger1"].iloc[0]
+        assert yt_row["enrichment_offer_type"] == "discount"
+        assert yt_row["score_urgency"] == 8
+
+        # Reels row has Reels enrichment
+        reel_row = result[result["Name"] == "blogger2"].iloc[0]
+        assert reel_row["enrichment_offer_type"] == "free_consultation"
+        assert reel_row["score_urgency"] == 5
+        assert reel_row["enrichment_integration_text"] == "Full reel ad text"
+
+        # Non-enriched row stays empty
+        other_row = result[result["Name"] == "blogger3"].iloc[0]
+        assert pd.isna(other_row.get("enrichment_offer_type", float("nan")))
+
 
 # ── prepare_data_for_claude ───────────────────────────────────
 

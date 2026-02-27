@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,10 @@ def download_audio(
         logger.debug("Audio already exists, skipping: %s", output_path)
         return {"success": True, "audio_path": output_path, "error": None}
 
-    # Check yt-dlp is available
-    if not shutil.which("yt-dlp"):
+    # Check yt-dlp is available via module import
+    try:
+        import yt_dlp
+    except ImportError:
         return {
             "success": False,
             "audio_path": None,
@@ -45,8 +48,9 @@ def download_audio(
         }
 
     output_template = os.path.join(output_dir, f"{video_id}.%(ext)s")
+    # Execute via python module to bypass broken Windows .exe launchers
     cmd = [
-        "yt-dlp",
+        sys.executable, "-m", "yt_dlp",
         "--extract-audio",
         "--audio-format", "mp3",
         "--audio-quality", "5",
