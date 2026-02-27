@@ -206,11 +206,14 @@ def _save_platform_raw(
 
     # Load existing if resuming
     existing = []
-    existing_ids = set()
     if raw_path.exists():
         with open(raw_path, "r", encoding="utf-8") as f:
             existing = json.load(f)
-        existing_ids = {r["video_id"] for r in existing}
+            
+    existing_successful_ids = {
+        r["video_id"] for r in existing
+        if r.get("has_transcript") and r.get("transcript_source") == "whisper"
+    }
 
     # Load CSV for metadata
     df = pd.read_csv(csv_path)
@@ -220,13 +223,16 @@ def _save_platform_raw(
         if cid:
             metadata_lookup[cid] = row.to_dict()
 
-    records = list(existing)
+    # Filter out existing records that we are about to re-process
+    processing_ids = {item["video_id"] for item in items if item["video_id"] not in existing_successful_ids}
+    records = [r for r in existing if r["video_id"] not in processing_ids]
     new_count = 0
 
     for item in items:
         video_id = item["video_id"]
-        if video_id in existing_ids:
+        if video_id in existing_successful_ids:
             continue
+
 
         result = transcriptions.get(video_id, {})
         dl_result = download_results.get(video_id, {})

@@ -32,17 +32,17 @@ _VALID_OFFER_TYPES = {
 
 _VALID_TONES = {
     "professional", "casual", "enthusiastic", "educational",
-    "humorous", "inspirational", "conversational", "mixed",
+    "humorous", "inspirational", "conversational", "skeptical_converted", "mixed",
 }
 
 _VALID_CTA_TYPES = {
     "link_click", "promo_code", "sign_up", "consultation",
-    "download", "other",
+    "download", "direct_link", "link_in_description", "other",
 }
 
 _VALID_LANDING_TYPES = {
     "website", "landing_page", "consultation_form", "app",
-    "promo_page", "other",
+    "promo_page", "programs_page", "free_consultation", "other",
 }
 
 
