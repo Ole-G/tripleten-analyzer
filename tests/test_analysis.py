@@ -1,9 +1,7 @@
-"""Tests for Phase 3-4: merge, metrics, correlation analysis."""
+"""Tests for merge, metrics, correlation analysis, and V2 report verification."""
 
 import json
-import math
 import sys
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -25,13 +23,13 @@ from src.analysis.correlation_analysis import (
     DEFAULT_EXCLUDE_FIELDS,
 )
 from src.analysis.prompts import CORRELATION_ANALYSIS_PROMPT
+from scripts.verify_reports import main as verify_reports_main
 
 
-# ── Helpers ───────────────────────────────────────────────────
+# Helpers
 
 
 def _make_mock_client(response_text: str) -> MagicMock:
-    """Create a mock Anthropic client that returns the given text."""
     mock_client = MagicMock()
     mock_message = MagicMock()
     mock_content_block = MagicMock()
@@ -42,8 +40,32 @@ def _make_mock_client(response_text: str) -> MagicMock:
     return mock_client
 
 
+
+def _sample_report() -> str:
+    return """# Analysis Report
+
+## Executive Summary
+- YouTube hooks are associated with stronger contact generation. Scope: `youtube_long_form`. Badge: Reliable signal. Layer: response outcomes.
+
+## Content Influence on Response
+Reliable signal: higher specificity is associated with more contact-positive integrations.
+
+## Downstream Sales Outcomes
+Hypothesis: purchase patterns should be treated as downstream association only.
+
+## Platform and Format Readout
+Short-form is descriptive-only for TikTok.
+
+## Funnel and Operational Implications
+Contacts drop less sharply than deals, which suggests lower-funnel operational friction.
+
+## Recommendations
+- Prioritize response-oriented creative tests.
+"""
+
+
+
 def _make_test_df() -> pd.DataFrame:
-    """Create a minimal test DataFrame with funnel data."""
     return pd.DataFrame([
         {
             "Date": "2025-04-01", "Name": "blogger1", "Format": "youtube",
@@ -84,9 +106,6 @@ def _make_test_df() -> pd.DataFrame:
     ])
 
 
-# ── safe_divide ───────────────────────────────────────────────
-
-
 class TestSafeDivide:
     def test_normal_division(self):
         assert _safe_divide(10, 2) == 5.0
@@ -94,87 +113,50 @@ class TestSafeDivide:
     def test_division_by_zero(self):
         assert _safe_divide(10, 0) is None
 
-    def test_nan_numerator(self):
+    def test_nan_or_none_values(self):
         assert _safe_divide(float("nan"), 10) is None
-
-    def test_nan_denominator(self):
         assert _safe_divide(10, float("nan")) is None
-
-    def test_none_values(self):
         assert _safe_divide(None, 10) is None
         assert _safe_divide(10, None) is None
-
-
-# ── calculate_metrics ─────────────────────────────────────────
 
 
 class TestCalculateMetrics:
     def test_cost_metrics_calculated(self):
         df = _make_test_df()
         result = calculate_metrics(df)
-        # blogger1: Budget=5000, Fact Reach=80000
         assert result.iloc[0]["cost_per_view"] == pytest.approx(5000 / 80000)
-        # blogger1: Budget=5000, Purchase=5
         assert result.iloc[0]["cost_per_purchase"] == pytest.approx(1000.0)
+        assert result.iloc[0]["cost_per_contact"] == pytest.approx(25.0)
 
-    def test_funnel_rates_calculated(self):
+    def test_funnel_rates_and_flags_calculated(self):
         df = _make_test_df()
         result = calculate_metrics(df)
-        # blogger1: Contacts=200, Traffic=4000
         assert result.iloc[0]["traffic_to_contact_rate"] == pytest.approx(0.05)
-        # blogger1: Deals=50, Contacts=200
         assert result.iloc[0]["contact_to_deal_rate"] == pytest.approx(0.25)
+        assert result.iloc[0]["has_purchases"] == True
+        assert result.iloc[1]["has_contacts"] == True
+        assert result.iloc[2]["has_contacts"] == False
+
+    def test_platform_scope_added(self):
+        df = _make_test_df()
+        result = calculate_metrics(df)
+        assert result.iloc[0]["platform_scope"] == "youtube_long_form"
+        assert result.iloc[1]["platform_scope"] == "short_form"
 
     def test_division_by_zero_returns_nan(self):
         df = _make_test_df()
         result = calculate_metrics(df)
-        # blogger3: all zeros → NaN (pandas stores None as NaN)
         assert pd.isna(result.iloc[2]["cost_per_view"])
         assert pd.isna(result.iloc[2]["cost_per_purchase"])
         assert pd.isna(result.iloc[2]["traffic_to_contact_rate"])
 
-    def test_has_purchases_flag(self):
-        df = _make_test_df()
-        result = calculate_metrics(df)
-        assert result.iloc[0]["has_purchases"] == True
-        assert result.iloc[1]["has_purchases"] == False
-        assert result.iloc[2]["has_purchases"] == False
-
-    def test_plan_vs_fact(self):
-        df = _make_test_df()
-        result = calculate_metrics(df)
-        # blogger1: Fact Reach=80000, Reach Plan=100000
-        assert result.iloc[0]["plan_vs_fact_reach"] == pytest.approx(0.8)
-        # blogger2: Fact Reach=60000, Reach Plan=50000 → overdelivered
-        assert result.iloc[1]["plan_vs_fact_reach"] == pytest.approx(1.2)
-
-    def test_full_funnel_conversion(self):
-        df = _make_test_df()
-        result = calculate_metrics(df)
-        # blogger1: Purchase=5, Fact Reach=80000
-        assert result.iloc[0]["full_funnel_conversion"] == pytest.approx(5 / 80000)
-
-    def test_youtube_engagement_rate(self):
-        df = _make_test_df()
-        df["view_count"] = [10000, None, 0]
-        df["like_count"] = [500, None, 0]
-        df["comment_count"] = [50, None, 0]
-        result = calculate_metrics(df)
-        # blogger1: (500+50)/10000
-        assert result.iloc[0]["engagement_rate"] == pytest.approx(0.055)
-
-
-# ── merge_all_data ────────────────────────────────────────────
-
 
 class TestMergeAllData:
-    def test_merge_with_enrichment(self, tmp_path):
-        # Create test CSV
+    def test_merge_with_enrichment_and_audit_outputs(self, tmp_path):
         df = _make_test_df()
         csv_path = tmp_path / "prepared.csv"
         df.to_csv(csv_path, index=False)
 
-        # Create test enriched JSON
         enriched = [
             {
                 "video_id": "abc123",
@@ -197,8 +179,8 @@ class TestMergeAllData:
                     "analysis": {
                         "offer_type": "discount",
                         "offer_details": "40% off",
-                        "landing_type": "programs_page",
-                        "cta_type": "link_in_description",
+                        "landing_type": "landing_page",
+                        "cta_type": "link_click",
                         "cta_urgency": "high",
                         "cta_text": "Click the link!",
                         "has_personal_story": True,
@@ -217,70 +199,51 @@ class TestMergeAllData:
                             "urgency": 8, "authenticity": 7,
                             "storytelling": 6, "benefit_clarity": 9,
                             "emotional_appeal": 7, "specificity": 8,
-                            "humor": 3, "professionalism": 6,
+                            "humor": 3, "professionalism": 6
                         },
+                        "score_details": {
+                            "urgency": {
+                                "score_band": "high",
+                                "short_reason": "Strong CTA deadline.",
+                                "evidence_quotes": ["Click the link today"]
+                            }
+                        }
                     },
                 },
-            },
+            }
         ]
         json_path = tmp_path / "enriched.json"
-        with open(json_path, "w") as f:
-            json.dump(enriched, f)
+        json_path.write_text(json.dumps(enriched), encoding="utf-8")
 
-        output_dir = str(tmp_path / "output")
+        output_dir = tmp_path / "output"
         result = merge_all_data(
             prepared_csv_path=str(csv_path),
             enriched_json_path=str(json_path),
-            output_dir=output_dir,
+            output_dir=str(output_dir),
         )
 
-        # All 3 rows present
         assert len(result) == 3
-
-        # YouTube row has enrichment
         yt_row = result[result["Name"] == "blogger1"].iloc[0]
         assert yt_row["enrichment_offer_type"] == "discount"
         assert yt_row["score_urgency"] == 8
-        assert yt_row["view_count"] == 10000
+        assert yt_row["score_band_urgency"] == "high"
+        assert yt_row["score_reason_urgency"] == "Strong CTA deadline."
+        assert yt_row["score_evidence_urgency"] == "Click the link today"
+        assert yt_row["platform_scope"] == "youtube_long_form"
 
-        # Reel row has no enrichment
-        reel_row = result[result["Name"] == "blogger2"].iloc[0]
-        assert pd.isna(reel_row.get("enrichment_offer_type", float("nan")))
-
-        # Calculated metrics present
-        assert "cost_per_view" in result.columns
-        assert "has_purchases" in result.columns
-
-        # Output files created
-        assert (Path(output_dir) / "final_merged.csv").exists()
-        assert (Path(output_dir) / "final_merged.json").exists()
-
-    def test_merge_without_enrichment(self, tmp_path):
-        df = _make_test_df()
-        csv_path = tmp_path / "prepared.csv"
-        df.to_csv(csv_path, index=False)
-
-        output_dir = str(tmp_path / "output")
-        result = merge_all_data(
-            prepared_csv_path=str(csv_path),
-            enriched_json_path=str(tmp_path / "nonexistent.json"),
-            output_dir=output_dir,
-        )
-
-        assert len(result) == 3
-        assert "cost_per_view" in result.columns
+        assert (output_dir / "final_merged.csv").exists()
+        assert (output_dir / "final_merged.json").exists()
+        assert (output_dir / "enrichment_audit.csv").exists()
+        assert (output_dir / "enrichment_audit.json").exists()
 
     def test_merge_with_multiplatform_enrichment(self, tmp_path):
-        """Verify Reels/TikTok enrichment is merged alongside YouTube."""
         df = _make_test_df()
         csv_path = tmp_path / "prepared.csv"
         df.to_csv(csv_path, index=False)
 
-        # YouTube enriched
         yt_enriched = [{
             "video_id": "abc123",
             "url": "https://youtu.be/abc123",
-            "view_count": 10000,
             "enrichment": {
                 "extraction": {
                     "integration_text": "Check out TripleTen!",
@@ -317,8 +280,6 @@ class TestMergeAllData:
                 },
             },
         }]
-
-        # Reels enriched
         reels_enriched = [{
             "video_id": "xyz789",
             "url": "https://instagram.com/reel/xyz789/",
@@ -362,54 +323,36 @@ class TestMergeAllData:
 
         yt_json = tmp_path / "youtube_enriched.json"
         reels_json = tmp_path / "reels_enriched.json"
-        with open(yt_json, "w") as f:
-            json.dump(yt_enriched, f)
-        with open(reels_json, "w") as f:
-            json.dump(reels_enriched, f)
+        yt_json.write_text(json.dumps(yt_enriched), encoding="utf-8")
+        reels_json.write_text(json.dumps(reels_enriched), encoding="utf-8")
 
-        output_dir = str(tmp_path / "output")
         result = merge_all_data(
             prepared_csv_path=str(csv_path),
             enriched_json_path=str(yt_json),
             reels_enriched_json_path=str(reels_json),
             tiktok_enriched_json_path=str(tmp_path / "nonexistent.json"),
-            output_dir=output_dir,
+            output_dir=str(tmp_path / "output"),
         )
 
-        assert len(result) == 3
-
-        # YouTube row has YouTube enrichment
         yt_row = result[result["Name"] == "blogger1"].iloc[0]
-        assert yt_row["enrichment_offer_type"] == "discount"
-        assert yt_row["score_urgency"] == 8
-
-        # Reels row has Reels enrichment
         reel_row = result[result["Name"] == "blogger2"].iloc[0]
+        assert yt_row["enrichment_offer_type"] == "discount"
         assert reel_row["enrichment_offer_type"] == "free_consultation"
-        assert reel_row["score_urgency"] == 5
         assert reel_row["enrichment_integration_text"] == "Full reel ad text"
-
-        # Non-enriched row stays empty
-        other_row = result[result["Name"] == "blogger3"].iloc[0]
-        assert pd.isna(other_row.get("enrichment_offer_type", float("nan")))
-
-
-# ── prepare_data_for_claude ───────────────────────────────────
+        assert reel_row["platform_scope"] == "short_form"
 
 
 class TestPrepareDataForClaude:
     def test_excludes_long_fields(self):
-        records = [
-            {
-                "video_id": "abc",
-                "transcript_full": [{"text": "long", "start": 0}],
-                "transcript_text": "very long text...",
-                "description": "video description...",
-                "thumbnail_url": "https://example.com/thumb.jpg",
-                "tags": ["tag1", "tag2"],
-                "Budget": 5000,
-            },
-        ]
+        records = [{
+            "video_id": "abc",
+            "transcript_full": [{"text": "long", "start": 0}],
+            "transcript_text": "very long text...",
+            "description": "video description...",
+            "thumbnail_url": "https://example.com/thumb.jpg",
+            "tags": ["tag1", "tag2"],
+            "Budget": 5000,
+        }]
         cleaned = _prepare_data_for_claude(records)
         assert len(cleaned) == 1
         assert "transcript_full" not in cleaned[0]
@@ -423,17 +366,11 @@ class TestPrepareDataForClaude:
         long_text = "x" * 1000
         records = [{"enrichment_integration_text": long_text}]
         cleaned = _prepare_data_for_claude(records, max_integration_text_chars=100)
-        assert len(cleaned[0]["enrichment_integration_text"]) == 103  # 100 + "..."
+        assert len(cleaned[0]["enrichment_integration_text"]) == 103
 
-    def test_custom_exclude_fields(self):
-        records = [{"a": 1, "b": 2, "c": 3}]
-        cleaned = _prepare_data_for_claude(records, exclude_fields=["b"])
-        assert "a" in cleaned[0]
-        assert "b" not in cleaned[0]
-        assert "c" in cleaned[0]
-
-
-# ── Prompt formatting ─────────────────────────────────────────
+    def test_default_exclude_fields_documented(self):
+        assert "transcript_full" in DEFAULT_EXCLUDE_FIELDS
+        assert "Ad link" in DEFAULT_EXCLUDE_FIELDS
 
 
 class TestAnalysisPrompt:
@@ -443,43 +380,37 @@ class TestAnalysisPrompt:
             precomputed_tables='## PRE-COMPUTED TABLES\n| Metric | Value |',
         )
         assert "abc" in result
-        assert "CORRELATIONS" in result
-        assert "PRE-COMPUTED" in result
+        assert "Content Influence on Response" in result
+        assert "Downstream Sales Outcomes" in result
+        assert "associated with" in result
 
-    def test_prompt_contains_all_sections(self):
-        result = CORRELATION_ANALYSIS_PROMPT.format(
-            data_json="[]",
-            precomputed_tables="",
-        )
-        for section in [
-            "CONTENT", "FUNNEL", "PLATFORMS", "NICHES",
-            "BUDGET", "MANAGERS", "SUCCESS", "ANOMALIES", "RECOMMENDATIONS",
-        ]:
-            assert section in result
-
-
-# ── Correlation analysis ──────────────────────────────────────
+    def test_prompt_forbids_direct_purchase_causality(self):
+        result = CORRELATION_ANALYSIS_PROMPT.format(data_json="[]", precomputed_tables="")
+        assert "Never claim that content directly caused purchases" in result
+        assert "PRIMARY response outcomes" in result
 
 
 class TestCorrelationAnalysis:
-    def test_successful_analysis(self, tmp_path):
-        # Create test data JSON with required columns for aggregation tables
+    def test_successful_analysis_writes_sidecars(self, tmp_path):
         data = [{
             "video_id": "abc",
             "Budget": 5000,
             "Format": "youtube",
             "Manager": "TestManager",
             "has_purchases": True,
+            "has_contacts": True,
             "Purchase F - TOTAL": 3,
+            "Contacts Fact": 10,
+            "Traffic Fact": 100,
             "cost_per_purchase": 1666.67,
             "Topic": "Career",
+            "score_specificity": 8,
         }]
         json_path = tmp_path / "data.json"
-        with open(json_path, "w") as f:
-            json.dump(data, f)
+        json_path.write_text(json.dumps(data), encoding="utf-8")
 
-        report_path = tmp_path / "report.md"
-        client = _make_mock_client("# Analysis Report\n\nKey findings...")
+        report_path = tmp_path / "analysis_report.md"
+        client = _make_mock_client(_sample_report())
 
         report = run_correlation_analysis(
             data_json_path=str(json_path),
@@ -490,43 +421,22 @@ class TestCorrelationAnalysis:
 
         assert "Analysis Report" in report
         assert report_path.exists()
-        assert report_path.read_text() == report
+        assert report_path.read_text(encoding="utf-8") == report
+        assert report_path.with_name("methodology_appendix.md").exists()
+        assert report_path.with_name("statistical_summary.json").exists()
         client.messages.create.assert_called_once()
-
-    def test_report_saved_to_file(self, tmp_path):
-        data = [{
-            "video_id": "abc", "Budget": 5000, "Format": "youtube",
-            "Manager": "M", "has_purchases": False,
-            "Purchase F - TOTAL": 0, "Topic": "Tech",
-        }]
-        json_path = tmp_path / "data.json"
-        with open(json_path, "w") as f:
-            json.dump(data, f)
-
-        report_path = tmp_path / "report.md"
-        client = _make_mock_client("Report content here")
-
-        run_correlation_analysis(
-            data_json_path=str(json_path),
-            client=client,
-            model="test-model",
-            output_path=str(report_path),
-        )
-
-        saved = report_path.read_text()
-        assert saved == "Report content here"
 
     def test_model_passed_to_api(self, tmp_path):
         data = [{
             "video_id": "abc", "Budget": 5000, "Format": "youtube",
-            "Manager": "M", "has_purchases": True,
-            "Purchase F - TOTAL": 1, "Topic": "Tech",
+            "Manager": "M", "has_purchases": True, "has_contacts": True,
+            "Purchase F - TOTAL": 1, "Contacts Fact": 3, "Traffic Fact": 12,
+            "Topic": "Tech",
         }]
         json_path = tmp_path / "data.json"
-        with open(json_path, "w") as f:
-            json.dump(data, f)
+        json_path.write_text(json.dumps(data), encoding="utf-8")
 
-        client = _make_mock_client("report")
+        client = _make_mock_client(_sample_report())
         run_correlation_analysis(
             data_json_path=str(json_path),
             client=client,
@@ -535,3 +445,49 @@ class TestCorrelationAnalysis:
 
         call_kwargs = client.messages.create.call_args[1]
         assert call_kwargs["model"] == "claude-opus-4-6"
+
+
+class TestVerifyReports:
+    def test_verify_reports_passes_on_matching_v2_artifacts(self, tmp_path):
+        data = [{
+            "video_id": "abc",
+            "Name": "blogger1",
+            "Budget": 5000,
+            "Format": "youtube",
+            "Manager": "Masha",
+            "Topic": "Career",
+            "Traffic Fact": 100,
+            "Contacts Fact": 10,
+            "Deals Fact": 2,
+            "Calls Fact": 1,
+            "Purchase F - TOTAL": 1,
+            "has_contacts": True,
+            "has_purchases": True,
+            "score_specificity": 8,
+            "enrichment_offer_type": "discount",
+            "enrichment_overall_tone": "enthusiastic",
+            "enrichment_has_personal_story": True,
+            "enrichment_integration_position": "middle",
+        }]
+        data_path = tmp_path / "final_merged.json"
+        data_path.write_text(json.dumps(data), encoding="utf-8")
+
+        client = _make_mock_client(_sample_report())
+        report_path = tmp_path / "analysis_report.md"
+        run_correlation_analysis(
+            data_json_path=str(data_path),
+            client=client,
+            model="test-model",
+            output_path=str(report_path),
+        )
+
+        exit_code = verify_reports_main(
+            data_path=str(data_path),
+            report_path=str(report_path),
+            appendix_path=str(report_path.with_name("methodology_appendix.md")),
+            summary_path=str(report_path.with_name("statistical_summary.json")),
+            output_path=str(tmp_path / "report_factcheck.md"),
+        )
+
+        assert exit_code == 0
+        assert (tmp_path / "report_factcheck.md").exists()

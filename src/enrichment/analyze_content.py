@@ -2,15 +2,41 @@
 
 import json
 import logging
+import re
 import time
 
 import anthropic
 
+from src.analysis.inferential_stats import score_to_band
 from src.enrichment.prompts import ANALYZE_INTEGRATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
-_REQUIRED_KEYS = {
+SCORE_KEYS = {
+    "urgency", "authenticity", "storytelling", "benefit_clarity",
+    "emotional_appeal", "specificity", "humor", "professionalism",
+}
+
+VALID_ENUMS = {
+    "offer_type": {
+        "discount", "promo_code", "free_consultation", "free_trial",
+        "free_course", "trial", "bootcamp", "career_change", "other",
+    },
+    "overall_tone": {
+        "enthusiastic", "casual", "professional", "skeptical_converted",
+        "educational", "conversational", "humorous", "inspirational", "mixed",
+    },
+    "cta_type": {
+        "link_in_description", "promo_code", "qr_code", "swipe_up",
+        "direct_link", "link_click", "sign_up", "consultation", "download", "other",
+    },
+    "landing_type": {
+        "programs_page", "free_consultation", "specific_course", "website",
+        "landing_page", "consultation_form", "promo_page", "app", "other",
+    },
+}
+
+REQUIRED_KEYS = {
     "offer_type", "offer_details", "landing_type", "cta_type",
     "cta_urgency", "cta_text", "has_personal_story", "personal_story_type",
     "pain_points_addressed", "benefits_mentioned", "objection_handling",
@@ -19,35 +45,8 @@ _REQUIRED_KEYS = {
     "competitive_mention", "price_mentioned",
 }
 
-_SCORE_KEYS = {
-    "urgency", "authenticity", "storytelling", "benefit_clarity",
-    "emotional_appeal", "specificity", "humor", "professionalism",
-}
-
-# Valid enum values for categorical fields
-_VALID_OFFER_TYPES = {
-    "free_consultation", "free_course", "trial", "promo_code",
-    "discount", "bootcamp", "career_change", "other",
-}
-
-_VALID_TONES = {
-    "professional", "casual", "enthusiastic", "educational",
-    "humorous", "inspirational", "conversational", "skeptical_converted", "mixed",
-}
-
-_VALID_CTA_TYPES = {
-    "link_click", "promo_code", "sign_up", "consultation",
-    "download", "direct_link", "link_in_description", "other",
-}
-
-_VALID_LANDING_TYPES = {
-    "website", "landing_page", "consultation_form", "app",
-    "promo_page", "programs_page", "free_consultation", "other",
-}
-
 
 def _strip_markdown_fencing(text: str) -> str:
-    """Remove ```json ... ``` wrapping if present."""
     text = text.strip()
     if text.startswith("```"):
         first_newline = text.find("\n")
@@ -59,8 +58,7 @@ def _strip_markdown_fencing(text: str) -> str:
 
 
 def _validate_analysis_result(data: dict) -> None:
-    """Raise ValueError if required keys or score dimensions are missing."""
-    missing = _REQUIRED_KEYS - set(data.keys())
+    missing = REQUIRED_KEYS - set(data.keys())
     if missing:
         raise ValueError(f"Missing required keys in analysis result: {missing}")
 
@@ -68,51 +66,59 @@ def _validate_analysis_result(data: dict) -> None:
     if not isinstance(scores, dict):
         raise ValueError("'scores' must be a dict")
 
-    missing_scores = _SCORE_KEYS - set(scores.keys())
+    missing_scores = SCORE_KEYS - set(scores.keys())
     if missing_scores:
         raise ValueError(f"Missing score dimensions: {missing_scores}")
 
 
 def _clamp_scores(data: dict) -> dict:
-    """Clamp all score values to 1-10 range."""
     scores = data.get("scores", {})
-    for key in _SCORE_KEYS:
-        if key in scores:
-            try:
-                val = int(scores[key])
-                scores[key] = max(1, min(10, val))
-            except (ValueError, TypeError):
-                scores[key] = 5  # default if unparseable
+    for key in SCORE_KEYS:
+        try:
+            scores[key] = max(1, min(10, int(scores[key])))
+        except (TypeError, ValueError, KeyError):
+            scores[key] = 5
     data["scores"] = scores
     return data
 
 
 def _normalize_enums(data: dict) -> dict:
-    """Normalize categorical fields to valid enum values.
+    notes = []
+    for field, valid_values in VALID_ENUMS.items():
+        value = data.get(field)
+        if value is None:
+            continue
+        normalized = str(value).strip().lower()
+        if normalized not in valid_values:
+            notes.append(f"Unexpected {field} preserved verbatim: {normalized}")
+        data[field] = normalized
+    if notes:
+        data["validation_notes"] = notes
+    return data
 
-    Invalid values are replaced with defaults and logged as warnings.
-    """
-    _ENUM_FIELDS = {
-        "offer_type": (_VALID_OFFER_TYPES, "other"),
-        "overall_tone": (_VALID_TONES, "mixed"),
-        "cta_type": (_VALID_CTA_TYPES, "other"),
-        "landing_type": (_VALID_LANDING_TYPES, "other"),
-    }
 
-    for field, (valid_set, default) in _ENUM_FIELDS.items():
-        val = data.get(field)
-        if val is not None:
-            val_lower = str(val).lower().strip()
-            if val_lower not in valid_set:
-                logger.warning(
-                    "Unexpected %s value '%s', normalizing to '%s'. "
-                    "Valid values: %s",
-                    field, val, default, sorted(valid_set),
-                )
-                data[field] = default
-            else:
-                data[field] = val_lower  # normalize casing
+def _sentence_quotes(text: str, limit: int = 2) -> list[str]:
+    if not text:
+        return []
+    parts = [segment.strip() for segment in re.split(r"(?<=[.!?])\s+", text) if segment.strip()]
+    return parts[:limit] if parts else [text[:140].strip()]
 
+
+def _ensure_score_details(data: dict, integration_text: str) -> dict:
+    details = data.get("score_details") or {}
+    evidence_fallback = _sentence_quotes(integration_text, limit=2)
+
+    for key in SCORE_KEYS:
+        detail = details.get(key) or {}
+        detail["score_band"] = detail.get("score_band") or score_to_band(data["scores"].get(key))
+        detail["short_reason"] = detail.get("short_reason") or "Derived from the textual evidence in this ad segment."
+        quotes = detail.get("evidence_quotes") or evidence_fallback[:]
+        detail["evidence_quotes"] = [str(quote).strip() for quote in quotes if str(quote).strip()][:3]
+        if not detail["evidence_quotes"]:
+            detail["evidence_quotes"] = [integration_text[:140].strip()] if integration_text else []
+        details[key] = detail
+
+    data["score_details"] = details
     return data
 
 
@@ -125,27 +131,11 @@ def analyze_content(
     backoff_base: int = 2,
     backoff_max: int = 60,
 ) -> dict:
-    """
-    Analyze the ad integration text for structured content characteristics.
-
-    Args:
-        integration_text: The extracted ad integration text.
-        client: Initialized anthropic.Anthropic client.
-        model: Model name.
-        max_tokens: Max tokens for Claude response.
-        max_retries: Retries for invalid JSON responses.
-        backoff_base: Exponential backoff base.
-        backoff_max: Max backoff wait in seconds.
-
-    Returns:
-        Dict with all analysis fields, or dict with "error" key on failure.
-    """
     prompt = ANALYZE_INTEGRATION_PROMPT.format(integration_text=integration_text)
-
     last_error = None
     raw_response = ""
 
-    for attempt in range(1, max_retries + 2):  # +1 for initial attempt
+    for attempt in range(1, max_retries + 2):
         try:
             message = client.messages.create(
                 model=model,
@@ -158,35 +148,27 @@ def analyze_content(
             _validate_analysis_result(data)
             data = _clamp_scores(data)
             data = _normalize_enums(data)
+            data = _ensure_score_details(data, integration_text)
             return data
 
-        except anthropic.RateLimitError as e:
+        except anthropic.RateLimitError as error:
             wait = min(backoff_base ** attempt, backoff_max)
-            logger.warning(
-                "Rate limited (attempt %d/%d), waiting %.1fs: %s",
-                attempt, max_retries + 1, wait, e,
-            )
+            logger.warning("Rate limited (attempt %d/%d), waiting %.1fs: %s", attempt, max_retries + 1, wait, error)
             time.sleep(wait)
-            last_error = str(e)
+            last_error = str(error)
 
-        except anthropic.APIError as e:
-            logger.error("Anthropic API error: %s", e)
-            return {"error": f"API error: {e}"}
+        except anthropic.APIError as error:
+            logger.error("Anthropic API error: %s", error)
+            return {"error": f"API error: {error}"}
 
-        except (json.JSONDecodeError, ValueError) as e:
-            last_error = str(e)
+        except (json.JSONDecodeError, ValueError) as error:
+            last_error = str(error)
             if attempt <= max_retries:
                 wait = min(backoff_base ** attempt, backoff_max)
-                logger.warning(
-                    "Parse error (attempt %d/%d): %s. Retrying in %.1fs...",
-                    attempt, max_retries + 1, e, wait,
-                )
+                logger.warning("Parse error (attempt %d/%d): %s. Retrying in %.1fs...", attempt, max_retries + 1, error, wait)
                 time.sleep(wait)
             else:
-                logger.error(
-                    "Failed to parse analysis response after %d attempts: %s",
-                    max_retries + 1, e,
-                )
+                logger.error("Failed to parse analysis response after %d attempts: %s", max_retries + 1, error)
 
     return {
         "error": f"Failed after {max_retries + 1} attempts: {last_error}",

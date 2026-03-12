@@ -1,0 +1,450 @@
+{
+  "dataset_summary": {
+    "total_integrations": 1,
+    "with_traffic": 1,
+    "with_contacts": 1,
+    "with_deals": 1,
+    "with_purchases": 1
+  },
+  "tables": [
+    {
+      "table_id": "C1",
+      "title": "Content Score Comparison (Response)",
+      "scope": "youtube_long_form",
+      "population": "YouTube integrations with score data; contacts-positive=1, contacts-zero=0.",
+      "n": 1,
+      "outcome": "has_contacts",
+      "method": "Mean comparison, bootstrap 95% CI, Mann-Whitney U when both groups are large enough.",
+      "caveat": "Exploratory when one side has fewer than 8 scored integrations.",
+      "family": "content_features",
+      "stats_summary": {
+        "test_applied": false,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "metric": "specificity",
+          "with_contacts": 8.0,
+          "without_contacts": NaN,
+          "gap": null,
+          "n_with": 1,
+          "n_without": 0,
+          "ci_display": "N/A",
+          "p_value": null,
+          "effect_size": null,
+          "test_applied": false,
+          "descriptive_only": true,
+          "test_note": "Exploratory only: need at least 8 records per group.",
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "C2",
+      "title": "Offer Type and Contacts",
+      "scope": "youtube_long_form",
+      "population": "youtube_long_form integrations with populated `enrichment_offer_type`.",
+      "n": 1,
+      "outcome": "has_contacts",
+      "method": "Counts by category plus Fisher exact category-vs-rest when the sample is large enough.",
+      "caveat": "Rare categories are merged into `Other`; small groups remain exploratory.",
+      "family": "content_features",
+      "stats_summary": {
+        "test_applied": false,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "category": "Other",
+          "with_outcome": 1,
+          "without_outcome": 0,
+          "total": 1,
+          "outcome_rate": 1.0,
+          "odds_ratio": null,
+          "p_value": null,
+          "test_applied": false,
+          "descriptive_only": true,
+          "test_note": "Exploratory only: need at least 8 records per group.",
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "C3",
+      "title": "Offer Type and Contacts",
+      "scope": "short_form",
+      "population": "short_form rows with populated `enrichment_offer_type`.",
+      "n": 0,
+      "outcome": "has_contacts",
+      "method": "Descriptive only; no populated rows.",
+      "caveat": "No rows contain `enrichment_offer_type` values.",
+      "family": "content_features",
+      "stats_summary": {
+        "test_applied": false,
+        "evidence": "Hypothesis"
+      },
+      "rows": []
+    },
+    {
+      "table_id": "C4",
+      "title": "Offer Type and Contacts",
+      "scope": "cross_platform_comparable",
+      "population": "cross_platform_comparable integrations with populated `enrichment_offer_type`.",
+      "n": 1,
+      "outcome": "has_contacts",
+      "method": "Counts by category plus Fisher exact category-vs-rest when the sample is large enough.",
+      "caveat": "Rare categories are merged into `Other`; small groups remain exploratory.",
+      "family": "content_features",
+      "stats_summary": {
+        "test_applied": false,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "category": "Other",
+          "with_outcome": 1,
+          "without_outcome": 0,
+          "total": 1,
+          "outcome_rate": 1.0,
+          "odds_ratio": null,
+          "p_value": null,
+          "test_applied": false,
+          "descriptive_only": true,
+          "test_note": "Exploratory only: need at least 8 records per group.",
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "C5",
+      "title": "Tone and Contacts",
+      "scope": "youtube_long_form",
+      "population": "youtube_long_form integrations with populated `enrichment_overall_tone`.",
+      "n": 1,
+      "outcome": "has_contacts",
+      "method": "Counts by category plus Fisher exact category-vs-rest when the sample is large enough.",
+      "caveat": "Rare categories are merged into `Other`; small groups remain exploratory.",
+      "family": "content_features",
+      "stats_summary": {
+        "test_applied": false,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "category": "Other",
+          "with_outcome": 1,
+          "without_outcome": 0,
+          "total": 1,
+          "outcome_rate": 1.0,
+          "odds_ratio": null,
+          "p_value": null,
+          "test_applied": false,
+          "descriptive_only": true,
+          "test_note": "Exploratory only: need at least 8 records per group.",
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "C6",
+      "title": "Tone and Contacts",
+      "scope": "short_form",
+      "population": "short_form rows with populated `enrichment_overall_tone`.",
+      "n": 0,
+      "outcome": "has_contacts",
+      "method": "Descriptive only; no populated rows.",
+      "caveat": "No rows contain `enrichment_overall_tone` values.",
+      "family": "content_features",
+      "stats_summary": {
+        "test_applied": false,
+        "evidence": "Hypothesis"
+      },
+      "rows": []
+    },
+    {
+      "table_id": "C7",
+      "title": "Tone and Contacts",
+      "scope": "cross_platform_comparable",
+      "population": "cross_platform_comparable integrations with populated `enrichment_overall_tone`.",
+      "n": 1,
+      "outcome": "has_contacts",
+      "method": "Counts by category plus Fisher exact category-vs-rest when the sample is large enough.",
+      "caveat": "Rare categories are merged into `Other`; small groups remain exploratory.",
+      "family": "content_features",
+      "stats_summary": {
+        "test_applied": false,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "category": "Other",
+          "with_outcome": 1,
+          "without_outcome": 0,
+          "total": 1,
+          "outcome_rate": 1.0,
+          "odds_ratio": null,
+          "p_value": null,
+          "test_applied": false,
+          "descriptive_only": true,
+          "test_note": "Exploratory only: need at least 8 records per group.",
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "C8",
+      "title": "Personal Story and Contacts",
+      "scope": "cross_platform_comparable",
+      "population": "cross_platform_comparable integrations with populated `enrichment_has_personal_story`.",
+      "n": 1,
+      "outcome": "has_contacts",
+      "method": "Counts by category plus Fisher exact category-vs-rest when the sample is large enough.",
+      "caveat": "Rare categories are merged into `Other`; small groups remain exploratory.",
+      "family": "content_features",
+      "stats_summary": {
+        "test_applied": false,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "category": "Yes",
+          "with_outcome": 1,
+          "without_outcome": 0,
+          "total": 1,
+          "outcome_rate": 1.0,
+          "odds_ratio": null,
+          "p_value": null,
+          "test_applied": false,
+          "descriptive_only": true,
+          "test_note": "Exploratory only: need at least 8 records per group.",
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "C9",
+      "title": "Integration Position and Contacts",
+      "scope": "youtube_long_form",
+      "population": "youtube_long_form integrations with populated `enrichment_integration_position`.",
+      "n": 1,
+      "outcome": "has_contacts",
+      "method": "Counts by category plus Fisher exact category-vs-rest when the sample is large enough.",
+      "caveat": "Rare categories are merged into `Other`; small groups remain exploratory.",
+      "family": "content_features",
+      "stats_summary": {
+        "test_applied": false,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "category": "middle",
+          "with_outcome": 1,
+          "without_outcome": 0,
+          "total": 1,
+          "outcome_rate": 1.0,
+          "odds_ratio": null,
+          "p_value": null,
+          "test_applied": false,
+          "descriptive_only": true,
+          "test_note": "Exploratory only: need at least 8 records per group.",
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "R1",
+      "title": "Response Outcomes by Platform",
+      "scope": "cross_platform_comparable",
+      "population": "All integrations grouped by platform.",
+      "n": 1,
+      "outcome": "has_contacts",
+      "method": "Platform roll-up with a global chi-square test only when every platform bucket is sufficiently large.",
+      "caveat": "TikTok and any small platform bucket stay descriptive-only.",
+      "family": "platform_tables",
+      "stats_summary": {
+        "test_applied": false,
+        "p_value": null,
+        "effect_size": null,
+        "descriptive_only": true,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "platform": "youtube",
+          "count": 1,
+          "with_traffic": 1,
+          "with_contacts": 1,
+          "total_traffic": 100.0,
+          "total_contacts": 10.0,
+          "contact_rate": 1.0,
+          "median_cost_per_contact": null,
+          "descriptive_only": false,
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "R2",
+      "title": "Funnel Conversion Summary",
+      "scope": "cross_platform_comparable",
+      "population": "All integrations with available funnel columns.",
+      "n": 1,
+      "outcome": "funnel_stage_rates",
+      "method": "Descriptive medians and means over row-level funnel conversion rates.",
+      "caveat": "Used for operational diagnostics, not for significance claims.",
+      "family": "funnel_tables",
+      "stats_summary": {
+        "test_applied": false,
+        "descriptive_only": true,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "stage": "Reach -> Traffic",
+          "median": null,
+          "mean": null,
+          "nonzero": "0/0",
+          "evidence": "Hypothesis"
+        },
+        {
+          "stage": "Traffic -> Contacts",
+          "median": 0.1,
+          "mean": 0.1,
+          "nonzero": "1/1",
+          "evidence": "Hypothesis"
+        },
+        {
+          "stage": "Contacts -> Deals",
+          "median": 0.2,
+          "mean": 0.2,
+          "nonzero": "1/1",
+          "evidence": "Hypothesis"
+        },
+        {
+          "stage": "Deals -> Calls",
+          "median": 0.5,
+          "mean": 0.5,
+          "nonzero": "1/1",
+          "evidence": "Hypothesis"
+        },
+        {
+          "stage": "Calls -> Purchase",
+          "median": 1.0,
+          "mean": 1.0,
+          "nonzero": "1/1",
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "D1",
+      "title": "Downstream Outcomes by Platform",
+      "scope": "cross_platform_comparable",
+      "population": "All integrations grouped by platform.",
+      "n": 1,
+      "outcome": "has_purchases",
+      "method": "Platform roll-up plus a global chi-square test when the platform buckets are large enough.",
+      "caveat": "Treat this table as downstream association, not direct content impact.",
+      "family": "platform_tables",
+      "stats_summary": {
+        "test_applied": false,
+        "p_value": null,
+        "effect_size": null,
+        "descriptive_only": true,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "platform": "youtube",
+          "count": 1,
+          "with_purchases": 1,
+          "total_purchases": 1.0,
+          "purchase_rate": 1.0,
+          "avg_cpp": 5000.0,
+          "portfolio_cpp": 5000.0,
+          "descriptive_only": false,
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "D2",
+      "title": "Budget Tier Downstream Summary",
+      "scope": "cross_platform_comparable",
+      "population": "All integrations grouped by `Budget Tier`.",
+      "n": 1,
+      "outcome": "has_purchases",
+      "method": "Descriptive group roll-up with a global chi-square test when every bucket is sufficiently large.",
+      "caveat": "Small buckets remain exploratory; purchases are treated as downstream association only.",
+      "family": "budget_tables",
+      "stats_summary": {
+        "test_applied": false,
+        "p_value": null,
+        "effect_size": null,
+        "descriptive_only": true,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "group": "$3,001-$5,000",
+          "count": 1,
+          "budget": 5000.0,
+          "with_purchases": 1,
+          "total_purchases": 1.0,
+          "purchase_rate": 1.0,
+          "avg_cpp": 5000.0,
+          "evidence": "Hypothesis"
+        }
+      ]
+    },
+    {
+      "table_id": "D3",
+      "title": "Niche Downstream Summary",
+      "scope": "cross_platform_comparable",
+      "population": "All integrations grouped by `Topic`.",
+      "n": 0,
+      "outcome": "has_purchases",
+      "method": "Descriptive group roll-up with a global chi-square test when every bucket is sufficiently large.",
+      "caveat": "Small buckets remain exploratory; purchases are treated as downstream association only.",
+      "family": "niche_tables",
+      "stats_summary": {
+        "test_applied": false,
+        "p_value": null,
+        "effect_size": null,
+        "descriptive_only": true,
+        "evidence": "Hypothesis"
+      },
+      "rows": []
+    },
+    {
+      "table_id": "D4",
+      "title": "Manager Downstream Summary",
+      "scope": "cross_platform_comparable",
+      "population": "All integrations grouped by `Manager`.",
+      "n": 1,
+      "outcome": "has_purchases",
+      "method": "Descriptive group roll-up with a global chi-square test when every bucket is sufficiently large.",
+      "caveat": "Small buckets remain exploratory; purchases are treated as downstream association only.",
+      "family": "manager_tables",
+      "stats_summary": {
+        "test_applied": false,
+        "p_value": null,
+        "effect_size": null,
+        "descriptive_only": true,
+        "evidence": "Hypothesis"
+      },
+      "rows": [
+        {
+          "group": "Masha",
+          "count": 1,
+          "budget": 5000.0,
+          "with_purchases": 1,
+          "total_purchases": 1.0,
+          "purchase_rate": 1.0,
+          "avg_cpp": 5000.0,
+          "evidence": "Hypothesis"
+        }
+      ]
+    }
+  ]
+}

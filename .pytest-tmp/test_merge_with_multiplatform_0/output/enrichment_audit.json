@@ -1,0 +1,178 @@
+[
+  {
+    "integration": "abc123",
+    "platform": null,
+    "name": null,
+    "url": "https://youtu.be/abc123",
+    "dimension": "urgency",
+    "score": 8,
+    "band": "high",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "abc123",
+    "platform": null,
+    "name": null,
+    "url": "https://youtu.be/abc123",
+    "dimension": "authenticity",
+    "score": 7,
+    "band": "high",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "abc123",
+    "platform": null,
+    "name": null,
+    "url": "https://youtu.be/abc123",
+    "dimension": "storytelling",
+    "score": 6,
+    "band": "medium",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "abc123",
+    "platform": null,
+    "name": null,
+    "url": "https://youtu.be/abc123",
+    "dimension": "benefit_clarity",
+    "score": 9,
+    "band": "high",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "abc123",
+    "platform": null,
+    "name": null,
+    "url": "https://youtu.be/abc123",
+    "dimension": "emotional_appeal",
+    "score": 7,
+    "band": "high",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "abc123",
+    "platform": null,
+    "name": null,
+    "url": "https://youtu.be/abc123",
+    "dimension": "specificity",
+    "score": 8,
+    "band": "high",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "abc123",
+    "platform": null,
+    "name": null,
+    "url": "https://youtu.be/abc123",
+    "dimension": "humor",
+    "score": 3,
+    "band": "low",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "abc123",
+    "platform": null,
+    "name": null,
+    "url": "https://youtu.be/abc123",
+    "dimension": "professionalism",
+    "score": 6,
+    "band": "medium",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "xyz789",
+    "platform": "reels",
+    "name": null,
+    "url": "https://instagram.com/reel/xyz789/",
+    "dimension": "urgency",
+    "score": 5,
+    "band": "medium",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "xyz789",
+    "platform": "reels",
+    "name": null,
+    "url": "https://instagram.com/reel/xyz789/",
+    "dimension": "authenticity",
+    "score": 8,
+    "band": "high",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "xyz789",
+    "platform": "reels",
+    "name": null,
+    "url": "https://instagram.com/reel/xyz789/",
+    "dimension": "storytelling",
+    "score": 4,
+    "band": "medium",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "xyz789",
+    "platform": "reels",
+    "name": null,
+    "url": "https://instagram.com/reel/xyz789/",
+    "dimension": "benefit_clarity",
+    "score": 7,
+    "band": "high",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "xyz789",
+    "platform": "reels",
+    "name": null,
+    "url": "https://instagram.com/reel/xyz789/",
+    "dimension": "emotional_appeal",
+    "score": 6,
+    "band": "medium",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "xyz789",
+    "platform": "reels",
+    "name": null,
+    "url": "https://instagram.com/reel/xyz789/",
+    "dimension": "specificity",
+    "score": 5,
+    "band": "medium",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "xyz789",
+    "platform": "reels",
+    "name": null,
+    "url": "https://instagram.com/reel/xyz789/",
+    "dimension": "humor",
+    "score": 2,
+    "band": "low",
+    "reason": null,
+    "evidence_quotes": []
+  },
+  {
+    "integration": "xyz789",
+    "platform": "reels",
+    "name": null,
+    "url": "https://instagram.com/reel/xyz789/",
+    "dimension": "professionalism",
+    "score": 7,
+    "band": "high",
+    "reason": null,
+    "evidence_quotes": []
+  }
+]

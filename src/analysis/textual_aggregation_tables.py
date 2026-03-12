@@ -172,3 +172,4 @@ def compute_all_textual_tables(comparison: dict) -> str:
     )
 
     return header + "\n---\n\n".join(sections)
+

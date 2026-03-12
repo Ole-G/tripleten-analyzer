@@ -37,7 +37,7 @@ def main(
 
     1. Merge all data and calculate metrics (unless --skip-merge)
     2. Run correlation analysis via Claude
-    3. Save report
+    3. Save report plus methodology sidecars
     """
     config = load_config()
     setup_logging(config)
@@ -46,21 +46,17 @@ def main(
     enriched_dir = config["paths"]["enriched_dir"]
     analysis_cfg = config.get("analysis", {})
 
-    # Determine model
     if model is None:
         model = analysis_cfg.get("model", config["llm"]["model"])
     max_tokens = analysis_cfg.get("max_tokens", 16384)
 
-    # Step 1: Merge data
     json_path = Path(output_dir) / "final_merged.json"
 
     if skip_merge and json_path.exists():
-        logger.info("Skipping merge — using existing %s", json_path)
+        logger.info("Skipping merge - using existing %s", json_path)
     else:
         logger.info("Step 1: Merging all data sources and calculating metrics...")
-        enriched_json = input_path or str(
-            Path(enriched_dir) / "youtube_enriched.json"
-        )
+        enriched_json = input_path or str(Path(enriched_dir) / "youtube_enriched.json")
         merge_all_data(enriched_json_path=enriched_json, output_dir=output_dir)
         logger.info("Merge complete.")
 
@@ -68,21 +64,20 @@ def main(
         logger.error("final_merged.json not found at %s", json_path)
         sys.exit(1)
 
-    # Step 2: Correlation analysis
     logger.info("Step 2: Running correlation analysis with %s...", model)
 
     api_key = config["llm"]["anthropic_key"]
     if not api_key:
-        logger.error(
-            "ANTHROPIC_API_KEY not set. Add it to your .env file."
-        )
+        logger.error("ANTHROPIC_API_KEY not set. Add it to your .env file.")
         sys.exit(1)
 
     client = anthropic.Anthropic(api_key=api_key)
     retry_cfg = config.get("retry", {})
 
     report_path = Path(output_dir) / "analysis_report.md"
-    exclude_fields = analysis_cfg.get("exclude_fields")  # None → use code default
+    appendix_path = report_path.with_name("methodology_appendix.md")
+    summary_path = report_path.with_name("statistical_summary.json")
+    exclude_fields = analysis_cfg.get("exclude_fields")
 
     try:
         report = run_correlation_analysis(
@@ -98,14 +93,9 @@ def main(
         )
     except anthropic.APIError as e:
         error_str = str(e).lower()
-        if model != config["llm"]["model"] and (
-            "model" in error_str or "not found" in error_str
-        ):
+        if model != config["llm"]["model"] and ("model" in error_str or "not found" in error_str):
             fallback = config["llm"]["model"]
-            logger.warning(
-                "Model '%s' not available, falling back to '%s'",
-                model, fallback,
-            )
+            logger.warning("Model '%s' not available, falling back to '%s'", model, fallback)
             report = run_correlation_analysis(
                 data_json_path=str(json_path),
                 client=client,
@@ -120,12 +110,12 @@ def main(
         else:
             raise
 
-    # Summary
-    logger.info("Analysis complete!")
+    logger.info("Analysis complete.")
     logger.info("Report saved to: %s", report_path)
+    logger.info("Methodology appendix saved to: %s", appendix_path)
+    logger.info("Statistical summary saved to: %s", summary_path)
     logger.info("Report length: %d characters", len(report))
 
-    # Print first few lines as preview
     lines = report.strip().split("\n")
     preview = "\n".join(lines[:20])
     print(f"\n{'=' * 60}")
@@ -135,7 +125,9 @@ def main(
     if len(lines) > 20:
         print(f"\n... ({len(lines) - 20} more lines)")
     print(f"{'=' * 60}")
-    print(f"Full report: {report_path}")
+    print(f"Main report: {report_path}")
+    print(f"Methodology appendix: {appendix_path}")
+    print(f"Statistical summary: {summary_path}")
 
 
 if __name__ == "__main__":

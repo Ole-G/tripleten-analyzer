@@ -557,5 +557,6 @@ class TestPromptFormatting:
         assert "Existing Report" in result
         assert "sample_sizes" in result
         assert "TestChannel" in result
-        assert "Opening Patterns That Convert" in result
+        assert "Opening Patterns" in result
         assert "PRE-COMPUTED" in result
+

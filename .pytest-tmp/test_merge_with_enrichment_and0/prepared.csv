@@ -1,0 +1,4 @@
+Date,Name,Format,Ad link,Topic,Manager,Budget,Reach (Plan),Fact Reach,Traffic Plan,Traffic Fact,Contacts Fact,Deals Fact,Calls Fact,Purchase F - TOTAL,CMC F - TOTAL,is_parseable,url_type,content_id,integration_timestamp
+2025-04-01,blogger1,youtube,https://youtu.be/abc123,Tech,Masha,5000,100000,80000,5000,4000,200,50,20,5,1000.0,True,youtube,abc123,331.0
+2025-04-02,blogger2,reel,https://instagram.com/reel/xyz789/,Finance,Arina,2000,50000,60000,2000,2500,100,0,0,0,,True,instagram_reel,xyz789,
+2025-04-03,blogger3,youtube,https://youtu.be/def456,Career,Masha,0,0,0,0,0,0,0,0,0,0.0,True,youtube,def456,
