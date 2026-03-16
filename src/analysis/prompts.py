@@ -146,9 +146,11 @@ You are given:
 - NEVER use has_contacts as an outcome variable. Use cost_per_contact and \
 traffic_to_contact_rate as the continuous response outcomes.
 - NEVER combine YouTube and short-form enrichment features in one comparison. \
-YouTube-only features (integration position, duration bins) are scoped to \
-youtube_only. Short-form features (hook type, pacing) are scoped to \
-short_form_only.
+YouTube-only features (integration_position, tone, offer_type with YouTube \
+context) are scoped to youtube_only. Short-form features are scoped to \
+short_form_only. Cross-platform comparison is limited to funnel metrics only.
+- If a score dimension is flagged as "unstable" (ICC < 0.5) in the tables, \
+note this and treat any correlation involving that dimension as unreliable.
 - ALWAYS include effect size, confidence interval, and power statement for \
 each finding.
 - ALWAYS state sample size and evidence level badge for each claim.
@@ -229,8 +231,9 @@ Provide:
 and whether it meets the 80% threshold,
 - sample size constraints and which comparisons are most affected,
 - what we CANNOT claim from this data (explicit list of 3-5 non-claims),
-- ICC stability summary from the enrichment audit if available \
-(which enrichment features had acceptable inter-rater reliability),
+- ICC stability summary: check if any score dimensions in the correlation \
+tables are flagged as "unstable" or "moderate" — note which dimensions \
+have acceptable inter-rater reliability and which do not,
 - multiple comparisons consideration: how many tests were run and \
 the risk of false positives.
 
@@ -350,7 +353,10 @@ or concrete examples? Quantify the difference.
 ### Cross-Reference with Quantitative Analysis
 Connect textual findings to the Layer 1 quantitative findings from the \
 existing report. Which textual patterns align with the strongest \
-statistical signals? Do NOT cross-reference with Layer 2 (purchases).
+statistical signals (e.g., Spearman correlations between scores and \
+cost_per_contact)? Do NOT cross-reference with Layer 2 (purchases). \
+Remember: both the textual and quantitative analyses use cost_per_contact \
+as the performance metric, so findings should be complementary.
 
 ### High-Performer Script Template
 Based on observed patterns, provide a structural template for a \
@@ -397,6 +403,15 @@ You are given:
 1. The three reviewer questions.
 2. The full v2 analysis report data (two-layer framework).
 3. Funnel data with stage-by-stage metrics.
+
+## METHODOLOGY CONTEXT
+The v2 report uses a two-layer framework: Layer 1 (Content Impact Zone) \
+measures content effectiveness via cost_per_contact and traffic_to_contact_rate. \
+Layer 2 (Sales Operations Context) describes downstream purchase associations \
+without causal claims. Enrichment scores were validated via 3-run ICC analysis. \
+Statistical tests use Spearman correlations, Kruskal-Wallis, and Cliff's delta \
+with Benjamini-Hochberg FDR correction. Reference this methodology when \
+explaining analytical choices in your answers.
 
 ## CRITICAL RULES
 - Be direct and specific. No marketing fluff or vague generalities.
