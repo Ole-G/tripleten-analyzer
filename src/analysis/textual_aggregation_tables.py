@@ -173,3 +173,185 @@ def compute_all_textual_tables(comparison: dict) -> str:
 
     return header + "\n---\n\n".join(sections)
 
+
+# ---------------------------------------------------------------------------
+# V2 tables: high_performers / low_performers (cost_per_contact quartiles)
+# ---------------------------------------------------------------------------
+
+def _compute_text_stats_comparison_v2(comparison: dict) -> str:
+    """Textual Table T1v2: Text statistics — high vs low performers."""
+    lines = [
+        "### Pre-computed Textual Table T1: Text Statistics Comparison\n",
+    ]
+
+    stats = comparison.get("text_stats_comparison", {})
+    high = stats.get("high_performers", {})
+    low = stats.get("low_performers", {})
+
+    lines.append(
+        "| Metric | High Performers | Low Performers | Gap |"
+    )
+    lines.append("|---|---|---|---|")
+
+    metrics = [
+        ("avg_word_count", "Avg Word Count"),
+        ("avg_sentence_count", "Avg Sentence Count"),
+        ("avg_question_count", "Avg Question Count"),
+        ("avg_exclamation_count", "Avg Exclamation Count"),
+        ("avg_first_person_count", "Avg First Person (I/my/me)"),
+        ("avg_second_person_count", "Avg Second Person (you/your)"),
+        ("avg_product_mentions", "Avg Product Mentions"),
+    ]
+
+    for key, label in metrics:
+        h_val = high.get(key, np.nan)
+        l_val = low.get(key, np.nan)
+        if isinstance(h_val, (int, float)) and isinstance(
+            l_val, (int, float)
+        ):
+            gap = h_val - l_val
+            sign = "+" if gap >= 0 else ""
+            lines.append(
+                f"| {label} | {_fmt(h_val)} | {_fmt(l_val)} "
+                f"| {sign}{_fmt(gap)} |"
+            )
+        else:
+            lines.append(
+                f"| {label} | {_fmt(h_val)} | {_fmt(l_val)} | N/A |"
+            )
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _compute_opening_pattern_rates_v2(comparison: dict) -> str:
+    """Textual Table T2v2: Opening pattern distribution — high vs low."""
+    lines = [
+        "### Pre-computed Textual Table T2: Opening Pattern Distribution\n",
+    ]
+
+    op = comparison.get("opening_patterns", {})
+    high = op.get("high_performers", {})
+    low = op.get("low_performers", {})
+
+    all_types = set(list(high.keys()) + list(low.keys()))
+
+    lines.append(
+        "| Opening Type | High Performers | Low Performers | Total |"
+    )
+    lines.append("|---|---|---|---|")
+
+    for otype in sorted(all_types):
+        h = high.get(otype, 0)
+        lo = low.get(otype, 0)
+        lines.append(f"| {otype} | {h} | {lo} | {h + lo} |")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _compute_closing_pattern_rates_v2(comparison: dict) -> str:
+    """Textual Table T3v2: Closing pattern distribution — high vs low."""
+    lines = [
+        "### Pre-computed Textual Table T3: Closing Pattern Distribution\n",
+    ]
+
+    cp = comparison.get("closing_patterns", {})
+    high = cp.get("high_performers", {})
+    low = cp.get("low_performers", {})
+
+    all_types = set(list(high.keys()) + list(low.keys()))
+
+    lines.append(
+        "| Closing Type | High Performers | Low Performers | Total |"
+    )
+    lines.append("|---|---|---|---|")
+
+    for ctype in sorted(all_types):
+        h = high.get(ctype, 0)
+        lo = low.get(ctype, 0)
+        lines.append(f"| {ctype} | {h} | {lo} | {h + lo} |")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _compute_persuasion_function_rates_v2(comparison: dict) -> str:
+    """Textual Table T4v2: Persuasion function distribution — high vs low."""
+    lines = [
+        "### Pre-computed Textual Table T4: Persuasion Function Distribution\n",
+    ]
+
+    pf = comparison.get("persuasion_functions", {})
+    high = pf.get("high_performers", {})
+    low = pf.get("low_performers", {})
+
+    all_funcs = set(list(high.keys()) + list(low.keys()))
+
+    lines.append(
+        "| Function | High Performers | Low Performers | Total |"
+    )
+    lines.append("|---|---|---|---|")
+
+    for func in sorted(all_funcs):
+        h = high.get(func, 0)
+        lo = low.get(func, 0)
+        lines.append(f"| {func} | {h} | {lo} | {h + lo} |")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def compute_all_textual_tables_v2(comparison: dict) -> str:
+    """Compute all textual tables for v2 (cost_per_contact quartile split).
+
+    Works with comparison dicts from build_textual_comparison_v2() that use
+    high_performers / low_performers keys.
+
+    Args:
+        comparison: Output dict from build_textual_comparison_v2().
+
+    Returns:
+        Combined markdown string with all textual tables.
+    """
+    sample = comparison.get("sample_sizes", {})
+
+    sections = [
+        _compute_text_stats_comparison_v2(comparison),
+        _compute_opening_pattern_rates_v2(comparison),
+        _compute_closing_pattern_rates_v2(comparison),
+        _compute_persuasion_function_rates_v2(comparison),
+    ]
+
+    breakdown = sample.get("platform_breakdown", {})
+    yt_info = breakdown.get("youtube", {})
+    sf_info = breakdown.get("short_form", {})
+
+    header = (
+        "## PRE-COMPUTED TEXTUAL AGGREGATION TABLES "
+        "(Response-Based Classification)\n\n"
+        "> **IMPORTANT**: The tables below were computed by code from "
+        "the raw data.\n"
+        "> Use these EXACT numbers — do NOT recalculate sums, counts, "
+        "or rates yourself.\n"
+        "> Your role is to INTERPRET and ANALYZE these numbers.\n\n"
+        "> **Classification method**: Integrations are split by "
+        "cost_per_contact quartiles\n"
+        "> (Budget / Contacts Fact). Q1 (lowest cost = most efficient) "
+        "= High Performers;\n"
+        "> Q4 (highest cost) = Low Performers. Middle 50%% excluded "
+        "for cleaner signal.\n\n"
+        f"**Sample sizes:** {sample.get('high_performers', 0)} "
+        f"high-performers, "
+        f"{sample.get('low_performers', 0)} low-performers, "
+        f"{sample.get('excluded_middle', 0)} excluded (middle 50%%)\n\n"
+        f"**Platform breakdown:** YouTube: {yt_info.get('total', 0)} "
+        f"({yt_info.get('high_performers', 0)} high / "
+        f"{yt_info.get('low_performers', 0)} low) | "
+        f"Short-form: {sf_info.get('total', 0)} "
+        f"({sf_info.get('high_performers', 0)} high / "
+        f"{sf_info.get('low_performers', 0)} low)\n\n"
+    )
+
+    return header + "\n---\n\n".join(sections)
+
