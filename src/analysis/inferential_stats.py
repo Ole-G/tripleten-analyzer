@@ -300,3 +300,296 @@ def _median(values: list[float]) -> float:
     if length % 2 == 1:
         return ordered[middle]
     return (ordered[middle - 1] + ordered[middle]) / 2.0
+
+
+# ---------------------------------------------------------------------------
+# Extended inferential helpers (v2 methodology)
+# ---------------------------------------------------------------------------
+
+
+def _inverse_normal_cdf(p: float) -> float:
+    """Approximate inverse standard-normal CDF (Abramowitz & Stegun 26.2.23).
+
+    Accurate to about 4.5e-4 for 0 < p < 1.
+    """
+    if p <= 0.0:
+        return -inf
+    if p >= 1.0:
+        return inf
+    if p == 0.5:
+        return 0.0
+
+    if p < 0.5:
+        return -_inverse_normal_cdf(1.0 - p)
+
+    # Rational approximation for 0.5 < p < 1
+    t = sqrt(-2.0 * math.log(1.0 - p))
+    c0, c1, c2 = 2.515517, 0.802853, 0.010328
+    d1, d2, d3 = 1.432788, 0.189269, 0.001308
+    return t - (c0 + c1 * t + c2 * t * t) / (
+        1.0 + d1 * t + d2 * t * t + d3 * t * t * t
+    )
+
+
+def _assign_ranks(values: list[float]) -> list[float]:
+    """Return average ranks for *values*, handling ties."""
+    indexed = sorted(enumerate(values), key=lambda pair: pair[1])
+    ranks = [0.0] * len(values)
+    cursor = 0
+    while cursor < len(indexed):
+        next_cursor = cursor + 1
+        while (
+            next_cursor < len(indexed)
+            and indexed[next_cursor][1] == indexed[cursor][1]
+        ):
+            next_cursor += 1
+        avg_rank = (cursor + 1 + next_cursor) / 2.0
+        for idx in range(cursor, next_cursor):
+            ranks[indexed[idx][0]] = avg_rank
+        cursor = next_cursor
+    return ranks
+
+
+def icc_oneway(runs: list[list[float]]) -> dict:
+    """ICC(1,1) one-way random model for multi-run LLM scoring.
+
+    Parameters
+    ----------
+    runs : list[list[float]]
+        Each inner list contains scores from one evaluation run.
+        All inner lists must have the same length (number of subjects).
+
+    Returns
+    -------
+    dict with keys ``icc`` (float | None) and
+    ``stability`` ("stable" | "moderate" | "unstable" | "unknown").
+    """
+    null = {"icc": None, "stability": "unknown"}
+    if not runs or len(runs) < 2:
+        return null
+
+    k = len(runs)  # number of raters/runs
+    n = len(runs[0])
+    if n == 0:
+        return null
+    for run in runs:
+        if len(run) != n:
+            return null
+
+    # Grand mean
+    grand = sum(val for run in runs for val in run) / (n * k)
+
+    # Between-subjects mean square (MSB)
+    subject_means = [
+        sum(runs[r][j] for r in range(k)) / k for j in range(n)
+    ]
+    msb = k * sum((m - grand) ** 2 for m in subject_means) / max(n - 1, 1)
+
+    # Within-subjects mean square (MSW)
+    ssw = 0.0
+    for j in range(n):
+        for r in range(k):
+            ssw += (runs[r][j] - subject_means[j]) ** 2
+    msw = ssw / max(n * (k - 1), 1)
+
+    # ICC(1,1)
+    denom = msb + (k - 1) * msw
+    if denom == 0:
+        icc_val = 1.0  # zero variance everywhere -> perfect agreement
+    else:
+        icc_val = (msb - msw) / denom
+
+    if icc_val >= 0.75:
+        stability = "stable"
+    elif icc_val >= 0.5:
+        stability = "moderate"
+    else:
+        stability = "unstable"
+
+    return {"icc": icc_val, "stability": stability}
+
+
+def spearman_rank(x: list[float], y: list[float]) -> dict:
+    """Spearman rank-order correlation with a *t*-approximation p-value.
+
+    Handles ties via average ranking.
+
+    Returns
+    -------
+    dict with keys ``rho``, ``p_value``, ``n``.
+    """
+    if len(x) != len(y):
+        return {"rho": None, "p_value": None, "n": min(len(x), len(y))}
+    n = len(x)
+    if n < 3:
+        return {"rho": None, "p_value": None, "n": n}
+
+    rx = _assign_ranks(x)
+    ry = _assign_ranks(y)
+
+    mean_rx = sum(rx) / n
+    mean_ry = sum(ry) / n
+
+    cov = sum((rx[i] - mean_rx) * (ry[i] - mean_ry) for i in range(n))
+    var_rx = sum((r - mean_rx) ** 2 for r in rx)
+    var_ry = sum((r - mean_ry) ** 2 for r in ry)
+
+    denom = sqrt(var_rx * var_ry)
+    if denom == 0:
+        return {"rho": None, "p_value": None, "n": n}
+
+    rho = cov / denom
+
+    # t-approximation: t = rho * sqrt((n-2) / (1 - rho^2))
+    rho_sq = min(rho * rho, 1.0 - 1e-15)
+    t_stat = rho * sqrt((n - 2) / (1.0 - rho_sq))
+    # Approximate two-sided p via normal CDF (valid for n >= ~10)
+    p_value = 2.0 * (1.0 - _normal_cdf(abs(t_stat)))
+    p_value = min(max(p_value, 0.0), 1.0)
+
+    return {"rho": rho, "p_value": p_value, "n": n}
+
+
+def kruskal_wallis(groups: list[list[float]]) -> dict:
+    """Kruskal-Wallis H test for comparing k independent groups.
+
+    Returns
+    -------
+    dict with keys ``h_stat``, ``p_value``, ``df``.
+    """
+    null = {"h_stat": None, "p_value": None, "df": 0}
+    if not groups or len(groups) < 2:
+        return null
+
+    # Filter out empty groups
+    non_empty = [g for g in groups if len(g) > 0]
+    if len(non_empty) < 2:
+        return null
+
+    k = len(non_empty)
+    N = sum(len(g) for g in non_empty)
+
+    # Pool all values with group labels
+    combined: list[tuple[float, int]] = []
+    for group_id, grp in enumerate(non_empty):
+        for val in grp:
+            combined.append((float(val), group_id))
+
+    combined.sort(key=lambda item: item[0])
+
+    # Assign average ranks
+    ranks = [0.0] * N
+    cursor = 0
+    tie_counter: Counter[float] = Counter()
+    while cursor < N:
+        next_cursor = cursor + 1
+        while (
+            next_cursor < N
+            and combined[next_cursor][0] == combined[cursor][0]
+        ):
+            next_cursor += 1
+        avg_rank = (cursor + 1 + next_cursor) / 2.0
+        tie_counter[combined[cursor][0]] += next_cursor - cursor
+        for idx in range(cursor, next_cursor):
+            ranks[idx] = avg_rank
+        cursor = next_cursor
+
+    # Sum of ranks per group
+    group_rank_sums = [0.0] * k
+    group_sizes = [0] * k
+    for idx, (_, gid) in enumerate(combined):
+        group_rank_sums[gid] += ranks[idx]
+        group_sizes[gid] += 1
+
+    # H statistic
+    h_stat = (12.0 / (N * (N + 1))) * sum(
+        group_rank_sums[i] ** 2 / group_sizes[i] for i in range(k)
+    ) - 3.0 * (N + 1)
+
+    # Tie correction
+    tie_term = sum(t ** 3 - t for t in tie_counter.values())
+    if N > 1 and tie_term > 0:
+        correction = 1.0 - tie_term / (N ** 3 - N)
+        if correction > 0:
+            h_stat /= correction
+
+    df = k - 1
+    p_value = _chi_square_survival(h_stat, df)
+
+    return {"h_stat": h_stat, "p_value": p_value, "df": df}
+
+
+def cliffs_delta(group_a: list[float], group_b: list[float]) -> dict:
+    """Cliff's delta effect-size measure for two independent groups.
+
+    Returns
+    -------
+    dict with keys ``delta`` and ``magnitude``
+    ("negligible" | "small" | "medium" | "large" | "unknown").
+    """
+    null = {"delta": None, "magnitude": "unknown"}
+    clean_a = [float(v) for v in group_a if v is not None]
+    clean_b = [float(v) for v in group_b if v is not None]
+    if not clean_a or not clean_b:
+        return null
+
+    n_a = len(clean_a)
+    n_b = len(clean_b)
+    dominance = 0.0
+    for a in clean_a:
+        for b in clean_b:
+            if a > b:
+                dominance += 1.0
+            elif a < b:
+                dominance -= 1.0
+
+    delta = dominance / (n_a * n_b)
+
+    abs_d = abs(delta)
+    if abs_d < 0.147:
+        magnitude = "negligible"
+    elif abs_d < 0.33:
+        magnitude = "small"
+    elif abs_d < 0.474:
+        magnitude = "medium"
+    else:
+        magnitude = "large"
+
+    return {"delta": delta, "magnitude": magnitude}
+
+
+def power_analysis_twosample(
+    n_per_group: int,
+    effect_size: float,
+    alpha: float = 0.05,
+) -> dict:
+    """Approximate statistical power for a two-sample t-test (normal approx).
+
+    Parameters
+    ----------
+    n_per_group : int
+        Sample size per group.
+    effect_size : float
+        Cohen's *d* (standardised mean difference).
+    alpha : float
+        Two-sided significance level.
+
+    Returns
+    -------
+    dict with ``power`` and ``required_n_for_80pct`` (int | None).
+    """
+    z_alpha = _inverse_normal_cdf(1.0 - alpha / 2.0)
+
+    se = sqrt(2.0 / max(n_per_group, 1))
+    z_power = effect_size / se - z_alpha
+    power = _normal_cdf(z_power)
+    power = min(max(power, 0.0), 1.0)
+
+    # Required n for 80 % power
+    required_n: int | None = None
+    if effect_size > 0:
+        z_beta = _inverse_normal_cdf(0.80)
+        raw_n = 2.0 * ((z_alpha + z_beta) / effect_size) ** 2
+        required_n = max(int(math.ceil(raw_n)), 2)
+
+    return {"power": power, "required_n_for_80pct": required_n}
